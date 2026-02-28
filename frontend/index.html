@@ -386,7 +386,9 @@
       }
 
       function isRunningStatus(status) {
-        return /running|ready|online|available|success|active|启动中|运行中/.test(normalizeStatus(status));
+        return /running|ready|online|available|success|active|starting|recover|启动中|运行中|恢复中/.test(
+          normalizeStatus(status)
+        );
       }
 
       function extractTaskStatus(detailPayload) {
@@ -397,29 +399,125 @@
         return String(data.status || data.task_status || data.taskStatus || "").trim();
       }
 
-      function extractTaskServiceBaseUrl(detailPayload) {
-        const data = detailPayload && detailPayload.data;
-        if (!data || typeof data !== "object") {
+      function normalizeBaseUrl(url) {
+        if (typeof url !== "string") {
           return "";
         }
+        const trimmed = url.trim();
+        if (!trimmed) {
+          return "";
+        }
+        return trimmed.replace(/\/$/, "");
+      }
+
+      function extractTaskServiceBaseUrls(detailPayload) {
+        const data = detailPayload && detailPayload.data;
+        if (!data || typeof data !== "object") {
+          return [];
+        }
+
         const services = Array.isArray(data.services) ? data.services : [];
-        let fallback = "";
+        const preferred = [];
+        const fallback = [];
+
+        function pushUnique(target, value) {
+          const base = normalizeBaseUrl(value);
+          if (!base) {
+            return;
+          }
+          if (!target.includes(base)) {
+            target.push(base);
+          }
+        }
+
         for (const service of services) {
-          const remotePorts = Array.isArray(service.remote_ports) ? service.remote_ports : [];
+          const remotePorts = Array.isArray(service.remote_ports)
+            ? service.remote_ports
+            : (Array.isArray(service.remotePorts) ? service.remotePorts : []);
+
+          pushUnique(fallback, service.url);
+          pushUnique(fallback, service.service_url);
+          pushUnique(fallback, service.serviceUrl);
+
           for (const portItem of remotePorts) {
-            const url = typeof portItem.url === "string" ? portItem.url.trim() : "";
+            const url = normalizeBaseUrl(
+              portItem.url || portItem.external_url || portItem.externalUrl || portItem.host_url || portItem.hostUrl
+            );
             if (!url) {
               continue;
             }
-            if (!fallback) {
-              fallback = url;
-            }
-            if (Number(portItem.service_port) === Number(OPEN_API.servicePort)) {
-              return url.replace(/\/$/, "");
+
+            const servicePort = Number(
+              portItem.service_port ?? portItem.servicePort ?? portItem.target_port ?? portItem.targetPort
+            );
+            if (Number.isFinite(servicePort) && servicePort === Number(OPEN_API.servicePort)) {
+              pushUnique(preferred, url);
+            } else {
+              pushUnique(fallback, url);
             }
           }
         }
-        return fallback ? fallback.replace(/\/$/, "") : "";
+
+        return preferred.concat(fallback).filter((v, idx, arr) => arr.indexOf(v) === idx);
+      }
+
+      function extractTaskServiceBaseUrl(detailPayload) {
+        const urls = extractTaskServiceBaseUrls(detailPayload);
+        return urls[0] || "";
+      }
+
+      function getCurrentOriginBase() {
+        if (!window.location || !/^https?:$/i.test(window.location.protocol)) {
+          return "";
+        }
+        const origin = normalizeBaseUrl(window.location.origin);
+        if (!origin || origin.includes("openapi.suanli.cn")) {
+          return "";
+        }
+        return origin;
+      }
+
+      async function checkBackendHealth(base, timeoutMs = 6000) {
+        const normalizedBase = normalizeBaseUrl(base);
+        if (!normalizedBase) {
+          return false;
+        }
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          const response = await fetch(`${normalizedBase}/health`, {
+            cache: "no-store",
+            signal: controller.signal,
+          });
+          return response.ok;
+        } catch (error) {
+          return false;
+        } finally {
+          window.clearTimeout(timer);
+        }
+      }
+
+      function collectProbeBases(detailPayload) {
+        const candidates = [];
+
+        function pushUnique(base) {
+          const normalized = normalizeBaseUrl(base);
+          if (!normalized) {
+            return;
+          }
+          if (!candidates.includes(normalized)) {
+            candidates.push(normalized);
+          }
+        }
+
+        pushUnique(runtimeApiBase);
+        if (detailPayload) {
+          for (const base of extractTaskServiceBaseUrls(detailPayload)) {
+            pushUnique(base);
+          }
+        }
+        pushUnique(getCurrentOriginBase());
+        return candidates;
       }
 
       function buildOpenApiHeaders() {
@@ -504,34 +602,34 @@
         const deadline = Date.now() + timeoutMs;
         let lastStatus = "";
         let lastBase = "";
+        let lastDetailError = "";
         while (Date.now() < deadline) {
-          let baseToCheck = runtimeApiBase;
+          let detailPayload = null;
           try {
-            const detail = await callTaskDetailApi();
-            const status = extractTaskStatus(detail);
-            const fromDetailBase = extractTaskServiceBaseUrl(detail);
+            detailPayload = await callTaskDetailApi();
+            const status = extractTaskStatus(detailPayload);
             if (status) {
               lastStatus = status;
             }
-            if (fromDetailBase) {
-              runtimeApiBase = fromDetailBase;
-              baseToCheck = fromDetailBase;
-              lastBase = fromDetailBase;
-            }
-            if (baseToCheck && (!status || isRunningStatus(status))) {
-              const response = await fetch(`${baseToCheck}/health`, { cache: "no-store" });
-              if (response.ok) {
-                backendInfo.textContent = `后端地址：${baseToCheck}`;
-                return baseToCheck;
-              }
-            }
           } catch (error) {
-            // ignore transient startup failures
+            lastDetailError = error && error.message ? error.message : String(error || "");
+          }
+
+          const probeBases = collectProbeBases(detailPayload);
+          for (const baseToCheck of probeBases) {
+            lastBase = baseToCheck;
+            const healthy = await checkBackendHealth(baseToCheck);
+            if (healthy) {
+              runtimeApiBase = baseToCheck;
+              backendInfo.textContent = `后端地址：${baseToCheck}`;
+              return baseToCheck;
+            }
           }
           await sleep(intervalMs);
         }
+        const detailSuffix = lastDetailError ? `，detail错误：${lastDetailError}` : "";
         throw new Error(
-          `任务恢复超时，后端尚未就绪。最后状态：${lastStatus || "unknown"}，最后地址：${lastBase || runtimeApiBase || "none"}`
+          `任务恢复超时，后端尚未就绪。最后状态：${lastStatus || "unknown"}，最后地址：${lastBase || runtimeApiBase || "none"}${detailSuffix}`
         );
       }
 
@@ -542,15 +640,23 @@
 
         backendReadyPromise = (async () => {
           setRunStatus("检查远程任务状态");
-          const detail = await callTaskDetailApi();
-          const status = extractTaskStatus(detail);
-          const fromDetailBase = extractTaskServiceBaseUrl(detail);
-          if (fromDetailBase) {
-            runtimeApiBase = fromDetailBase;
+          let status = "";
+          let detailOk = false;
+          let recovered = false;
+
+          try {
+            const detail = await callTaskDetailApi();
+            detailOk = true;
+            status = extractTaskStatus(detail);
+            const fromDetailBase = extractTaskServiceBaseUrl(detail);
+            if (fromDetailBase) {
+              runtimeApiBase = fromDetailBase;
+            }
+          } catch (error) {
+            appendLog(`detail 检查失败，尝试直接探活后端：${error.message || error}`);
           }
 
-          let recovered = false;
-          if (!isRunningStatus(status)) {
+          if (detailOk && !isRunningStatus(status)) {
             setRunStatus("任务未运行，执行恢复");
             await callTaskControlApi("recover");
             recovered = true;

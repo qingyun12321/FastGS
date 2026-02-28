@@ -536,6 +536,16 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/ready")
+def ready():
+    return {"status": "ok"}
+
+
+@app.get("/live")
+def live():
+    return {"status": "ok"}
+
+
 @app.get("/status")
 def status():
     data = dict(_state)
