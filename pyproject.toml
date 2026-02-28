@@ -1,0 +1,37 @@
+[project]
+name = "fastgs"
+version = "0.1.0"
+description = "FastGS development environment managed by uv"
+readme = "README.md"
+requires-python = ">=3.10,<3.11"
+dependencies = [
+    "numpy<2",
+    "pillow",
+    "plyfile",
+    "tqdm",
+    "websockets",
+    "torch==1.12.1+cu116",
+    "torchvision==0.13.1+cu116",
+    "torchaudio==0.12.1+cu116",
+    "diff_gaussian_rasterization_fastgs",
+    "simple_knn",
+    "fused_ssim",
+]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu116" }]
+torchvision = [{ index = "pytorch-cu116" }]
+torchaudio = [{ index = "pytorch-cu116" }]
+diff_gaussian_rasterization_fastgs = { path = "submodules/diff-gaussian-rasterization_fastgs", editable = true }
+simple_knn = { path = "submodules/simple-knn", editable = true }
+fused_ssim = { path = "submodules/fused-ssim", editable = true }
+
+[[tool.uv.index]]
+name = "pytorch-cu116"
+url = "https://download.pytorch.org/whl/cu116"
+explicit = true
+
+[tool.uv.extra-build-dependencies]
+diff-gaussian-rasterization-fastgs = ["setuptools<81", "torch==1.12.1+cu116"]
+simple-knn = ["setuptools<81", "torch==1.12.1+cu116"]
+fused-ssim = ["setuptools<81", "torch==1.12.1+cu116"]
