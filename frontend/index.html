@@ -42,15 +42,6 @@
         opacity: 0.8;
       }
 
-      .runtime {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        font-size: 12px;
-        opacity: 0.9;
-        text-align: right;
-      }
-
       .content {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -144,11 +135,6 @@
         <div class="brand">
           <div class="brand-title">魔芯科技</div>
           <div class="brand-sub">KOKONI · FastGS</div>
-        </div>
-        <div class="runtime">
-          <span id="taskInfo">OpenAPI TaskID: 1573688</span>
-          <span id="backendInfo">后端地址：未解析</span>
-          <span id="sessionInfo">会话：未创建</span>
         </div>
       </header>
 
@@ -320,9 +306,6 @@
       const elapsed = document.getElementById("elapsed");
       const queueStatus = document.getElementById("queueStatus");
       const runStatus = document.getElementById("runStatus");
-      const backendInfo = document.getElementById("backendInfo");
-      const sessionInfo = document.getElementById("sessionInfo");
-
       let runtimeApiBase = "";
       let sessionId = "";
       let outputDirHandle = null;
@@ -621,7 +604,6 @@
             const healthy = await checkBackendHealth(baseToCheck);
             if (healthy) {
               runtimeApiBase = baseToCheck;
-              backendInfo.textContent = `后端地址：${baseToCheck}`;
               return baseToCheck;
             }
           }
@@ -681,7 +663,6 @@
           throw new Error(data.detail || "创建会话失败");
         }
         sessionId = data.session_id || "";
-        sessionInfo.textContent = `会话：${sessionId || "未创建"}`;
         return sessionId;
       }
 
