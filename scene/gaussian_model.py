@@ -14,10 +14,23 @@ import numpy as np
 from utils.general_utils import inverse_sigmoid, get_expon_lr_func, build_rotation, identity_gate
 from torch import nn
 import os
+import sys
 from utils.system_utils import mkdir_p
 from plyfile import PlyData, PlyElement
 from utils.sh_utils import RGB2SH
-from simple_knn._C import distCUDA2
+try:
+    from simple_knn._C import distCUDA2
+except ModuleNotFoundError as first_error:
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    local_simple_knn = os.path.join(repo_root, "submodules", "simple-knn")
+    if os.path.isdir(local_simple_knn) and local_simple_knn not in sys.path:
+        sys.path.insert(0, local_simple_knn)
+    try:
+        from simple_knn._C import distCUDA2
+    except ModuleNotFoundError as second_error:
+        raise ModuleNotFoundError(
+            "simple_knn extension not found. Rebuild with `uv sync --frozen --reinstall-package simple_knn`."
+        ) from second_error
 from utils.graphics_utils import BasicPointCloud
 from utils.general_utils import strip_symmetric, build_scaling_rotation
 
