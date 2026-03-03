@@ -7,6 +7,7 @@ Task recover/pause is managed by suanli-task-manager.
 
 from __future__ import annotations
 
+import asyncio
 import glob
 import json
 import os
@@ -792,7 +793,7 @@ async def upload_dataset(file: UploadFile = File(...), session_id: str = Form(""
         total_bytes = await _save_upload_file(file, local_path)
         print(f"[upload_dataset] saved_local bytes={total_bytes} path={local_path}")
         oss_key = _join_oss_key(OSS_PREFIX, session["session_id"], "input", "dataset.zip")
-        oss_upload_file(local_path, oss_key)
+        await asyncio.to_thread(oss_upload_file, local_path, oss_key)
         print(f"[upload_dataset] uploaded_oss key={oss_key}")
         session["dataset_oss_key"] = oss_key
         return {
@@ -820,7 +821,7 @@ async def upload_model(file: UploadFile = File(...), session_id: str = Form(""))
         total_bytes = await _save_upload_file(file, local_path)
         print(f"[upload_model] saved_local bytes={total_bytes} path={local_path}")
         oss_key = _join_oss_key(OSS_PREFIX, session["session_id"], "input", "model.zip")
-        oss_upload_file(local_path, oss_key)
+        await asyncio.to_thread(oss_upload_file, local_path, oss_key)
         print(f"[upload_model] uploaded_oss key={oss_key}")
         session["model_oss_key"] = oss_key
         return {
@@ -849,7 +850,7 @@ async def upload_pose(file: UploadFile = File(...), session_id: str = Form("")):
         print(f"[upload_pose] saved_local bytes={total_bytes} path={local_path}")
         pose_name = f"pose_{int(time.time())}_{uuid.uuid4().hex[:8]}.json"
         oss_key = _join_oss_key(OSS_PREFIX, session["session_id"], "input", "pose", pose_name)
-        oss_upload_file(local_path, oss_key)
+        await asyncio.to_thread(oss_upload_file, local_path, oss_key)
         print(f"[upload_pose] uploaded_oss key={oss_key}")
 
         pose_keys: list[str] = session.get("pose_oss_keys", [])
