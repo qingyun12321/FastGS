@@ -446,6 +446,7 @@
       project: "fastgs",
       readyTimeoutMs: 15 * 60 * 1000,
       pollMs: 2000,
+      uploadTimeoutMs: 30 * 60 * 1000,
     };
 
     const qs = new URLSearchParams(window.location.search);
@@ -601,15 +602,28 @@
       formData.append("file", file);
       formData.append("session_id", state.sessionId);
 
-      const resp = await fetch(`${state.runtimeApiBase}/${endpoint}`, {
-        method: "POST",
-        body: formData,
-      });
-      const data = await parseJsonSafe(resp);
-      if (!resp.ok) {
-        throw new Error((data && data.detail) || `${label} 上传失败`);
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), config.uploadTimeoutMs);
+      try {
+        const resp = await fetch(`${state.runtimeApiBase}/${endpoint}`, {
+          method: "POST",
+          body: formData,
+          signal: controller.signal,
+        });
+        const data = await parseJsonSafe(resp);
+        if (!resp.ok) {
+          throw new Error((data && data.detail) || `${label} 上传失败 (HTTP ${resp.status})`);
+        }
+        return data || {};
+      } catch (error) {
+        if (error && error.name === "AbortError") {
+          const timeoutMin = Math.round(config.uploadTimeoutMs / 60000);
+          throw new Error(`${label} 上传超时（>${timeoutMin} 分钟）`);
+        }
+        throw error;
+      } finally {
+        window.clearTimeout(timer);
       }
-      return data || {};
     }
 
     async function uploadSelectedInputs() {
@@ -619,6 +633,7 @@
 
       if (dataset) {
         dom.datasetStatus.textContent = "上传中...";
+        appendLog(`开始上传数据集: ${dataset.name} (${(dataset.size / 1024 / 1024).toFixed(2)} MB)`);
         const data = await uploadInput("upload_dataset", dataset, "数据集");
         state.datasetOssKey = data.dataset_oss_key || state.datasetOssKey;
         dom.datasetStatus.textContent = state.datasetOssKey ? `已上传: ${state.datasetOssKey}` : "上传完成";
@@ -627,6 +642,7 @@
 
       if (model) {
         dom.modelStatus.textContent = "上传中...";
+        appendLog(`开始上传模型: ${model.name} (${(model.size / 1024 / 1024).toFixed(2)} MB)`);
         const data = await uploadInput("upload_model", model, "模型");
         state.modelOssKey = data.model_oss_key || state.modelOssKey;
         dom.modelStatus.textContent = state.modelOssKey ? `已上传: ${state.modelOssKey}` : "上传完成";
@@ -636,6 +652,7 @@
       if (dom.enablePose.checked) {
         if (pose) {
           dom.poseStatus.textContent = "上传中...";
+          appendLog(`开始上传 Pose: ${pose.name} (${(pose.size / 1024).toFixed(1)} KB)`);
           const data = await uploadInput("upload_pose", pose, "Pose");
           state.poseOssKey = data.pose_oss_key || state.poseOssKey;
           dom.poseStatus.textContent = state.poseOssKey ? `已上传: ${state.poseOssKey}` : "上传完成";
@@ -1134,6 +1151,7 @@
 
     appendLog(`task-manager=${config.taskManager}`);
     appendLog(`project=${config.project}`);
+    appendLog(`upload_timeout=${Math.round(config.uploadTimeoutMs / 60000)} min`);
     appendLog("就绪。点击“开始运行”后将自动恢复任务、上传输入并提交队列。");
   </script>
 </body>

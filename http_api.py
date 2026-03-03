@@ -210,7 +210,15 @@ def _oss_url(oss_key: str) -> str:
 
 
 def _run_ossutil(args: list[str]) -> str:
-    result = subprocess.run(["ossutil", *args], capture_output=True, text=True)
+    timeout_sec = int(os.getenv("FASTGS_OSSUTIL_TIMEOUT_SEC", "1800"))
+    cmd = ["ossutil", *args]
+    print(f"[oss] exec: {' '.join(cmd)} (timeout={timeout_sec}s)")
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_sec)
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"ossutil timeout after {timeout_sec}s: {' '.join(cmd[:3])}") from exc
+    except FileNotFoundError as exc:
+        raise RuntimeError("ossutil not found in PATH") from exc
     if result.returncode != 0:
         stderr = (result.stderr or "").strip()
         stdout = (result.stdout or "").strip()
@@ -780,9 +788,12 @@ async def upload_dataset(file: UploadFile = File(...), session_id: str = Form(""
     local_path = os.path.join(session["session_dir"], "uploads", f"dataset_{uuid.uuid4().hex}.zip")
 
     try:
+        print(f"[upload_dataset] start session={session['session_id']} filename={file.filename}")
         total_bytes = await _save_upload_file(file, local_path)
+        print(f"[upload_dataset] saved_local bytes={total_bytes} path={local_path}")
         oss_key = _join_oss_key(OSS_PREFIX, session["session_id"], "input", "dataset.zip")
         oss_upload_file(local_path, oss_key)
+        print(f"[upload_dataset] uploaded_oss key={oss_key}")
         session["dataset_oss_key"] = oss_key
         return {
             "session_id": session["session_id"],
@@ -805,9 +816,12 @@ async def upload_model(file: UploadFile = File(...), session_id: str = Form(""))
     local_path = os.path.join(session["session_dir"], "uploads", f"model_{uuid.uuid4().hex}.zip")
 
     try:
+        print(f"[upload_model] start session={session['session_id']} filename={file.filename}")
         total_bytes = await _save_upload_file(file, local_path)
+        print(f"[upload_model] saved_local bytes={total_bytes} path={local_path}")
         oss_key = _join_oss_key(OSS_PREFIX, session["session_id"], "input", "model.zip")
         oss_upload_file(local_path, oss_key)
+        print(f"[upload_model] uploaded_oss key={oss_key}")
         session["model_oss_key"] = oss_key
         return {
             "session_id": session["session_id"],
@@ -830,10 +844,13 @@ async def upload_pose(file: UploadFile = File(...), session_id: str = Form("")):
     local_path = os.path.join(session["session_dir"], "uploads", f"pose_{uuid.uuid4().hex}.json")
 
     try:
+        print(f"[upload_pose] start session={session['session_id']} filename={file.filename}")
         total_bytes = await _save_upload_file(file, local_path)
+        print(f"[upload_pose] saved_local bytes={total_bytes} path={local_path}")
         pose_name = f"pose_{int(time.time())}_{uuid.uuid4().hex[:8]}.json"
         oss_key = _join_oss_key(OSS_PREFIX, session["session_id"], "input", "pose", pose_name)
         oss_upload_file(local_path, oss_key)
+        print(f"[upload_pose] uploaded_oss key={oss_key}")
 
         pose_keys: list[str] = session.get("pose_oss_keys", [])
         pose_keys.append(oss_key)
