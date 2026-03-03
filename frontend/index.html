@@ -1,1186 +1,1140 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FastGS - 魔芯科技 KOKONI</title>
-    <style>
-      * {
-        box-sizing: border-box;
-      }
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KOKONI FastGS</title>
+  <style>
+    :root {
+      --bg: #0c1118;
+      --bg-soft: #121a24;
+      --panel: rgba(20, 29, 41, 0.92);
+      --panel-border: rgba(143, 163, 187, 0.24);
+      --text: #edf2f8;
+      --text-soft: rgba(237, 242, 248, 0.72);
+      --accent: #60a5fa;
+      --ok: #6dd4a4;
+      --warn: #f7c773;
+      --err: #fb9aa4;
+      --shadow: 0 18px 42px rgba(5, 9, 14, 0.4);
+    }
 
-      body {
-        margin: 0;
-        font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
-        background: #0f1218;
-        color: #e6e9ef;
-      }
+    * { box-sizing: border-box; }
 
-      .page {
-        max-width: 1100px;
-        margin: 0 auto;
-        padding: 24px;
-      }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(120% 130% at 0% 0%, rgba(64, 95, 147, 0.2), transparent 60%),
+        radial-gradient(120% 120% at 100% 0%, rgba(37, 99, 235, 0.12), transparent 62%),
+        linear-gradient(180deg, var(--bg), #090e14);
+      min-height: 100vh;
+    }
 
-      .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 24px;
-        gap: 16px;
-        flex-wrap: wrap;
-      }
+    .page {
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 24px 20px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
 
-      .brand-title {
-        font-size: 28px;
-        font-weight: 700;
-      }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
 
-      .brand-sub {
-        font-size: 18px;
-        opacity: 0.8;
-      }
+    .title {
+      margin: 0;
+      font-size: clamp(1.8rem, 4vw, 2.5rem);
+      font-weight: 700;
+      background: linear-gradient(90deg, #93c5fd, #2563eb 70%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
 
-      .content {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-        gap: 16px;
-      }
+    .subtitle {
+      margin-top: 6px;
+      color: var(--text-soft);
+      font-size: 0.92rem;
+    }
 
-      .card {
-        background: #171c25;
-        border: 1px solid #242b39;
-        border-radius: 12px;
-        padding: 16px;
-        min-height: 180px;
-      }
+    .config-line {
+      font-size: 0.82rem;
+      color: var(--text-soft);
+    }
 
-      .card h2 {
-        margin: 0 0 12px;
-        font-size: 18px;
-      }
+    .config-line code {
+      color: #cbe2ff;
+      font-size: 0.82rem;
+    }
 
-      .row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 10px;
-        flex-wrap: wrap;
-      }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(300px, 430px) minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
 
-      .row label {
-        min-width: 140px;
-        font-size: 14px;
-      }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
 
-      input,
-      button,
-      textarea {
-        background: #10141c;
-        color: #e6e9ef;
-        border: 1px solid #2f3747;
-        border-radius: 8px;
-        padding: 8px 10px;
-        font-size: 14px;
-      }
+    .panel h2 {
+      margin: 0 0 12px;
+      font-size: 1.02rem;
+    }
 
-      input[type="checkbox"] {
-        width: auto;
-      }
+    .section {
+      margin-bottom: 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px dashed rgba(143, 163, 187, 0.2);
+    }
 
-      input[type="file"] {
-        max-width: 220px;
-      }
+    .section:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+      margin-bottom: 0;
+    }
 
-      button {
-        cursor: pointer;
-      }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 0.86rem;
+      font-weight: 600;
+    }
 
-      .primary {
-        background: #3a7afe;
-        border-color: #3a7afe;
-        color: #fff;
-      }
+    input[type="file"],
+    input[type="number"],
+    input[type="text"] {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid rgba(143, 163, 187, 0.28);
+      background: rgba(8, 13, 20, 0.72);
+      color: var(--text);
+      padding: 9px 10px;
+      font-size: 0.88rem;
+    }
 
-      .status {
-        font-size: 12px;
-        opacity: 0.9;
-      }
+    .status-mini {
+      margin-top: 4px;
+      font-size: 0.78rem;
+      color: var(--text-soft);
+      word-break: break-all;
+    }
 
-      #logBox {
-        width: 100%;
-        height: 180px;
-        margin-top: 8px;
-        resize: vertical;
-        white-space: pre-wrap;
-      }
+    .hint {
+      margin-top: 4px;
+      font-size: 0.78rem;
+      color: var(--text-soft);
+    }
 
-      progress {
-        width: 100%;
-        height: 10px;
-        border-radius: 6px;
-        overflow: hidden;
-      }
+    .inline-check {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-right: 14px;
+      font-size: 0.86rem;
+      color: var(--text-soft);
+      cursor: pointer;
+    }
 
-      .hint {
-        font-size: 12px;
-        opacity: 0.75;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="page">
-      <header class="header">
-        <div class="brand">
-          <div class="brand-title">魔芯科技</div>
-          <div class="brand-sub">KOKONI · FastGS</div>
+    .inline-check input[type="checkbox"] {
+      accent-color: var(--accent);
+      width: 14px;
+      height: 14px;
+    }
+
+    .grid-two {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      background: linear-gradient(120deg, #93c5fd, #3b82f6);
+      color: #0a1220;
+      transition: transform 0.15s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .btn-secondary {
+      background: rgba(143, 163, 187, 0.2);
+      color: var(--text);
+      border: 1px solid rgba(143, 163, 187, 0.28);
+      font-weight: 600;
+    }
+
+    .log-box {
+      background: rgba(5, 10, 18, 0.78);
+      border: 1px solid rgba(143, 163, 187, 0.22);
+      border-radius: 10px;
+      min-height: 220px;
+      max-height: 340px;
+      overflow-y: auto;
+      padding: 10px;
+      margin: 0;
+      white-space: pre-wrap;
+      line-height: 1.4;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 11px;
+      color: rgba(234, 241, 255, 0.9);
+    }
+
+    .status-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .status-pill {
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: rgba(7, 12, 18, 0.76);
+      border: 1px solid rgba(143, 163, 187, 0.22);
+      font-size: 0.84rem;
+      color: var(--text-soft);
+    }
+
+    .status-pill.ok { color: var(--ok); border-color: rgba(109, 212, 164, 0.4); }
+    .status-pill.warn { color: var(--warn); border-color: rgba(247, 199, 115, 0.4); }
+    .status-pill.err { color: var(--err); border-color: rgba(251, 154, 164, 0.4); }
+
+    .result-box {
+      border-radius: 12px;
+      background: rgba(7, 12, 18, 0.72);
+      border: 1px solid rgba(143, 163, 187, 0.2);
+      padding: 10px;
+      margin-bottom: 12px;
+      min-height: 76px;
+    }
+
+    .result-box h3 {
+      margin: 0 0 6px;
+      font-size: 0.9rem;
+    }
+
+    .download-links {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .download-links a {
+      color: #9ec7ff;
+      text-decoration: none;
+      font-size: 0.84rem;
+      border-bottom: 1px dotted rgba(158, 199, 255, 0.5);
+    }
+
+    .download-links a:hover { text-decoration: underline; }
+
+    .video-wrap {
+      margin-bottom: 12px;
+    }
+
+    .video-wrap video {
+      width: 100%;
+      max-height: 340px;
+      border-radius: 10px;
+      background: #000;
+      border: 1px solid rgba(143, 163, 187, 0.2);
+    }
+
+    .viewer-box {
+      border-radius: 12px;
+      border: 1px dashed rgba(143, 163, 187, 0.32);
+      min-height: 480px;
+      background: rgba(5, 9, 16, 0.6);
+      position: relative;
+      overflow: hidden;
+    }
+
+    #ply-viewer {
+      width: 100%;
+      height: 480px;
+    }
+
+    #ply-viewer canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+    }
+
+    .viewer-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+      color: var(--text-soft);
+      font-size: 0.88rem;
+      pointer-events: none;
+    }
+
+    #pose-preview {
+      max-width: 100%;
+      max-height: 360px;
+      border-radius: 10px;
+      border: 1px solid rgba(143, 163, 187, 0.22);
+      margin-top: 8px;
+      display: none;
+    }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      .viewer-box, #ply-viewer { min-height: 360px; height: 360px; }
+      .grid-two { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <div>
+        <h1 class="title">KOKONI FastGS</h1>
+        <div class="subtitle">全链路 OSS 输入输出 + Task-Manager 托管恢复/暂停</div>
+      </div>
+      <div class="config-line">
+        task-manager: <code id="cfg-task-manager"></code><br />
+        project: <code id="cfg-project"></code>
+      </div>
+    </header>
+
+    <section class="layout">
+      <aside class="panel">
+        <h2>输入与参数</h2>
+
+        <div class="section">
+          <label for="dataset-file">数据集 ZIP（训练模式必填）</label>
+          <input id="dataset-file" type="file" accept=".zip" />
+          <div class="status-mini" id="dataset-status">未上传</div>
         </div>
-      </header>
 
-      <main class="content">
-        <section class="card">
-          <h2>数据集</h2>
-          <div class="row">
-            <label>上传数据集（zip）</label>
-            <input id="datasetZip" type="file" accept=".zip" />
-            <button id="uploadDatasetBtn">上传</button>
-            <span id="datasetUploadStatus" class="status"></span>
-          </div>
-          <div class="row">
-            <progress id="datasetProgress" value="0" max="100"></progress>
-          </div>
-        </section>
+        <div class="section">
+          <label for="model-file">模型 ZIP（仅渲染模式必填）</label>
+          <input id="model-file" type="file" accept=".zip" />
+          <div class="status-mini" id="model-status">未上传</div>
+        </div>
 
-        <section class="card">
-          <h2>模型输入</h2>
-          <div class="row">
-            <label>上传已训练模型（zip）</label>
-            <input id="modelZip" type="file" accept=".zip" />
-            <button id="uploadModelBtn">上传</button>
-            <span id="modelUploadStatus" class="status"></span>
-          </div>
-          <div class="row">
-            <label>
-              <input id="renderOnly" type="checkbox" />
-              不训练，仅渲染
-            </label>
-          </div>
-          <div class="row hint">render_only 模式会使用上传模型或已有输出目录。</div>
-        </section>
+        <div class="section">
+          <label class="inline-check">
+            <input id="enable-pose" type="checkbox" />
+            启用 Pose 渲染（JSON）
+          </label>
+          <input id="pose-file" type="file" accept=".json" />
+          <div class="status-mini" id="pose-status">未上传</div>
+        </div>
 
-        <section class="card">
-          <h2>渲染选项</h2>
-          <div class="row">
-            <label>
-              <input id="video360" type="checkbox" />
-              生成 360° 视频
-            </label>
-          </div>
-          <div class="row">
-            <label>
-              <input id="useDatasetCams" type="checkbox" checked />
-              使用原训练/测试相机并插帧
-            </label>
-          </div>
-          <div class="row">
-            <label>插值帧数（每对相机）</label>
-            <input id="interpPerPair" type="number" min="0" value="3" />
-          </div>
-          <div class="row">
-            <label>FPS</label>
-            <input id="fps" type="number" min="1" value="30" />
-          </div>
-          <div class="row">
-            <label>训练轮数</label>
-            <input id="iterations" type="number" min="1" value="30000" />
-          </div>
-        </section>
+        <div class="section">
+          <label class="inline-check">
+            <input id="render-only" type="checkbox" />
+            仅渲染（不训练）
+          </label>
+          <label class="inline-check">
+            <input id="video360" type="checkbox" />
+            生成 360 视频
+          </label>
+          <label class="inline-check">
+            <input id="use-dataset-cams" type="checkbox" checked />
+            使用数据集相机插帧
+          </label>
 
-        <section class="card">
-          <h2>Pose 渲染</h2>
-          <div class="row">
-            <label>
-              <input id="poseEnable" type="checkbox" />
-              指定 pose 渲染
-            </label>
+          <div class="grid-two" style="margin-top:8px;">
+            <div>
+              <label for="iterations">训练轮数</label>
+              <input id="iterations" type="number" min="1" value="30000" />
+            </div>
+            <div>
+              <label for="fps">视频 FPS</label>
+              <input id="fps" type="number" min="1" value="30" />
+            </div>
+            <div>
+              <label for="interp">相机插值帧/对</label>
+              <input id="interp" type="number" min="0" value="3" />
+            </div>
+            <div>
+              <label for="mult">渲染倍率 mult</label>
+              <input id="mult" type="number" min="0.1" step="0.1" value="0.5" />
+            </div>
           </div>
-          <div class="row">
-            <label>Pose JSON 路径（服务器内）</label>
-            <input id="posePath" type="text" placeholder="/workspace/tmp_fastgs/<session>/pose_xxx.json" />
-          </div>
-          <div class="row">
-            <label>或上传 pose JSON</label>
-            <input id="poseFile" type="file" accept=".json" />
-            <button id="uploadPoseBtn">上传</button>
-            <button id="renderPoseBtn">渲染Pose</button>
-            <span id="poseUploadStatus" class="status"></span>
-          </div>
-        </section>
+          <div class="hint">运行时会自动上传所选文件到 OSS，再提交任务。</div>
+        </div>
 
-        <section class="card">
-          <h2>模型与输出</h2>
-          <div class="row">
-            <label>
-              <input id="includePly" type="checkbox" checked />
-              下载模型点云
-            </label>
-            <label>
-              <input id="includeVideo" type="checkbox" />
-              下载360视频
-            </label>
-            <label>
-              <input id="includePose" type="checkbox" />
-              下载Pose渲染图
-            </label>
-          </div>
-          <div class="row">
-            <label>本地输出文件名</label>
-            <input id="localOutputName" type="text" placeholder="fastgs_output.zip" />
-          </div>
-          <div class="row">
-            <label>选择本地输出目录</label>
-            <button id="pickOutputDirBtn">选择目录</button>
-            <span id="outputDirStatus" class="status"></span>
-          </div>
-          <div class="row">
-            <progress id="downloadProgress" value="0" max="100"></progress>
-          </div>
-        </section>
+        <div class="actions">
+          <button id="run-btn" type="button">开始运行</button>
+          <button id="pause-btn" type="button" class="btn-secondary">仅暂停任务</button>
+          <button id="clear-btn" type="button" class="btn-secondary">清空日志/结果</button>
+        </div>
 
-        <section class="card">
-          <h2>运行与日志</h2>
-          <div class="row">
-            <button id="runBtn" class="primary">运行</button>
-            <button id="downloadBtn">下载输出</button>
-            <span id="elapsed">已用时间：00:00</span>
-          </div>
-          <div class="row">
-            <span id="queueStatus" class="status">队列：待机</span>
-            <span id="runStatus" class="status">状态：准备就绪</span>
-          </div>
-          <textarea id="logBox" readonly placeholder="日志输出..."></textarea>
-        </section>
-      </main>
-    </div>
+        <div class="section" style="margin-top:14px;">
+          <label>日志</label>
+          <pre id="log-box" class="log-box"></pre>
+        </div>
+      </aside>
 
-    <script>
-      const OPEN_API = {
-        base: "https://openapi.suanli.cn",
-        version: "1.0.0",
-        taskId: 1573688,
-        servicePort: 8000,
-        token: "f2ee1c4c-b678-4b3e-850b-e56a6f57bfd3-20260208093806",
-        readyTimeoutMs: 5 * 60 * 1000,
-      };
+      <section class="panel">
+        <h2>任务状态与结果</h2>
+        <div class="status-row">
+          <div id="run-status" class="status-pill">状态：就绪</div>
+          <div id="queue-status" class="status-pill">队列：待机</div>
+        </div>
 
-      const datasetZipInput = document.getElementById("datasetZip");
-      const uploadDatasetBtn = document.getElementById("uploadDatasetBtn");
-      const datasetUploadStatus = document.getElementById("datasetUploadStatus");
-      const datasetProgress = document.getElementById("datasetProgress");
-      const poseEnable = document.getElementById("poseEnable");
-      const posePathInput = document.getElementById("posePath");
-      const poseFileInput = document.getElementById("poseFile");
-      const uploadPoseBtn = document.getElementById("uploadPoseBtn");
-      const renderPoseBtn = document.getElementById("renderPoseBtn");
-      const poseUploadStatus = document.getElementById("poseUploadStatus");
-      const modelZipInput = document.getElementById("modelZip");
-      const uploadModelBtn = document.getElementById("uploadModelBtn");
-      const modelUploadStatus = document.getElementById("modelUploadStatus");
-      const renderOnly = document.getElementById("renderOnly");
-      const localOutputName = document.getElementById("localOutputName");
-      const pickOutputDirBtn = document.getElementById("pickOutputDirBtn");
-      const outputDirStatus = document.getElementById("outputDirStatus");
-      const includePly = document.getElementById("includePly");
-      const includeVideo = document.getElementById("includeVideo");
-      const includePose = document.getElementById("includePose");
-      const downloadProgress = document.getElementById("downloadProgress");
-      const iterationsInput = document.getElementById("iterations");
-      const video360 = document.getElementById("video360");
-      const useDatasetCams = document.getElementById("useDatasetCams");
-      const interpPerPair = document.getElementById("interpPerPair");
-      const fpsInput = document.getElementById("fps");
-      const runBtn = document.getElementById("runBtn");
-      const downloadBtn = document.getElementById("downloadBtn");
-      const logBox = document.getElementById("logBox");
-      const elapsed = document.getElementById("elapsed");
-      const queueStatus = document.getElementById("queueStatus");
-      const runStatus = document.getElementById("runStatus");
-      let runtimeApiBase = "";
-      let sessionId = "";
-      let outputDirHandle = null;
-      let datasetUploading = false;
-      let datasetUploaded = false;
-      let logTimer = null;
-      let elapsedTimer = null;
-      let startTime = null;
-      let currentRequestId = "";
-      let cachedDownloadBlob = null;
-      let cachedDownloadName = "";
-      let backendReadyPromise = null;
+        <div class="result-box">
+          <h3>OSS 结果文件</h3>
+          <div id="download-links" class="download-links"></div>
+          <img id="pose-preview" alt="Pose 渲染图" />
+        </div>
 
-      const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+        <div id="video-wrap" class="video-wrap hidden">
+          <video id="video-preview" controls playsinline></video>
+        </div>
 
-      function appendLog(message) {
-        logBox.value += `${message}\n`;
-        logBox.scrollTop = logBox.scrollHeight;
+        <div class="viewer-box">
+          <div id="ply-viewer"></div>
+          <div id="ply-placeholder" class="viewer-placeholder">任务完成后将在此预览 OSS 返回的 PLY 点云。</div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
       }
+    }
+  </script>
 
-      function setRunStatus(text) {
-        runStatus.textContent = `状态：${text}`;
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+    import { PLYLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/PLYLoader.js";
+
+    const config = {
+      taskManager: "http://36.133.236.108:8090",
+      project: "fastgs",
+      readyTimeoutMs: 15 * 60 * 1000,
+      pollMs: 2000,
+    };
+
+    const qs = new URLSearchParams(window.location.search);
+    if (qs.get("task_manager")) {
+      config.taskManager = String(qs.get("task_manager")).replace(/\/$/, "");
+    }
+    if (qs.get("project")) {
+      config.project = String(qs.get("project"));
+    }
+
+    const dom = {
+      cfgTaskManager: document.getElementById("cfg-task-manager"),
+      cfgProject: document.getElementById("cfg-project"),
+      datasetFile: document.getElementById("dataset-file"),
+      modelFile: document.getElementById("model-file"),
+      poseFile: document.getElementById("pose-file"),
+      enablePose: document.getElementById("enable-pose"),
+      renderOnly: document.getElementById("render-only"),
+      video360: document.getElementById("video360"),
+      useDatasetCams: document.getElementById("use-dataset-cams"),
+      iterations: document.getElementById("iterations"),
+      fps: document.getElementById("fps"),
+      interp: document.getElementById("interp"),
+      mult: document.getElementById("mult"),
+      datasetStatus: document.getElementById("dataset-status"),
+      modelStatus: document.getElementById("model-status"),
+      poseStatus: document.getElementById("pose-status"),
+      runBtn: document.getElementById("run-btn"),
+      pauseBtn: document.getElementById("pause-btn"),
+      clearBtn: document.getElementById("clear-btn"),
+      logBox: document.getElementById("log-box"),
+      runStatus: document.getElementById("run-status"),
+      queueStatus: document.getElementById("queue-status"),
+      downloadLinks: document.getElementById("download-links"),
+      posePreview: document.getElementById("pose-preview"),
+      videoWrap: document.getElementById("video-wrap"),
+      videoPreview: document.getElementById("video-preview"),
+      plyHost: document.getElementById("ply-viewer"),
+      plyPlaceholder: document.getElementById("ply-placeholder"),
+    };
+
+    const state = {
+      runtimeApiBase: "",
+      sessionId: "",
+      datasetOssKey: "",
+      modelOssKey: "",
+      poseOssKey: "",
+      logTimer: null,
+    };
+
+    dom.cfgTaskManager.textContent = config.taskManager;
+    dom.cfgProject.textContent = config.project;
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    function appendLog(line) {
+      const ts = new Date().toLocaleTimeString();
+      dom.logBox.textContent += `[${ts}] ${line}\n`;
+      dom.logBox.scrollTop = dom.logBox.scrollHeight;
+    }
+
+    function setRunStatus(text, type = "") {
+      dom.runStatus.textContent = `状态：${text}`;
+      dom.runStatus.classList.remove("ok", "warn", "err");
+      if (type) {
+        dom.runStatus.classList.add(type);
       }
+    }
 
-      function setQueueStatus(text) {
-        queueStatus.textContent = `队列：${text}`;
+    function setQueueStatus(text, type = "") {
+      dom.queueStatus.textContent = `队列：${text}`;
+      dom.queueStatus.classList.remove("ok", "warn", "err");
+      if (type) {
+        dom.queueStatus.classList.add(type);
       }
+    }
 
-      function normalizeCode(code) {
-        return String(code === undefined || code === null ? "" : code).trim().toLowerCase();
+    function normalizeBase(url) {
+      return String(url || "").trim().replace(/\/$/, "");
+    }
+
+    async function parseJsonSafe(resp) {
+      try {
+        return await resp.json();
+      } catch (_) {
+        return null;
       }
+    }
 
-      function isApiSuccess(payload) {
-        if (!payload || typeof payload !== "object") {
-          return false;
-        }
-        const code = normalizeCode(payload.code);
-        return code === "0000" || code === "0" || code === "200" || code === "ok" || code === "success";
+    async function tmRecover() {
+      const resp = await fetch(`${config.taskManager}/api/task/recover`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project: config.project }),
+      });
+      const payload = await parseJsonSafe(resp);
+      if (!resp.ok) {
+        const detail = (payload && (payload.detail || payload.message)) || (await resp.text()) || `HTTP ${resp.status}`;
+        throw new Error(`恢复任务失败: ${detail}`);
       }
+      return payload || {};
+    }
 
-      function extractPayloadMessage(payload) {
-        if (!payload || typeof payload !== "object") {
-          return "";
-        }
-        const message = payload.message || payload.msg || payload.detail || payload.error || "";
-        if (typeof message === "string") {
-          return message;
-        }
-        if (message && typeof message === "object") {
-          return JSON.stringify(message);
-        }
-        return String(message || "");
+    async function tmPause() {
+      const resp = await fetch(`${config.taskManager}/api/task/pause`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project: config.project }),
+      });
+      const payload = await parseJsonSafe(resp);
+      if (!resp.ok) {
+        const detail = (payload && (payload.detail || payload.message)) || (await resp.text()) || `HTTP ${resp.status}`;
+        throw new Error(`暂停任务失败: ${detail}`);
       }
+      return payload || {};
+    }
 
-      function isRecoverAlreadyRunning(message) {
-        return /already|running|active|运行中|已运行|无需恢复|未暂停|must.*paused|任务必须为暂停中/i.test(message || "");
-      }
-
-      function normalizeStatus(status) {
-        return String(status === undefined || status === null ? "" : status).trim().toLowerCase();
-      }
-
-      function isRunningStatus(status) {
-        return /running|ready|online|available|success|active|starting|recover|启动中|运行中|恢复中/.test(
-          normalizeStatus(status)
-        );
-      }
-
-      function extractTaskStatus(detailPayload) {
-        const data = detailPayload && detailPayload.data;
-        if (!data || typeof data !== "object") {
-          return "";
-        }
-        return String(data.status || data.task_status || data.taskStatus || "").trim();
-      }
-
-      function normalizeBaseUrl(url) {
-        if (typeof url !== "string") {
-          return "";
-        }
-        const trimmed = url.trim();
-        if (!trimmed) {
-          return "";
-        }
-        return trimmed.replace(/\/$/, "");
-      }
-
-      function extractTaskServiceBaseUrls(detailPayload) {
-        const data = detailPayload && detailPayload.data;
-        if (!data || typeof data !== "object") {
-          return [];
-        }
-
-        const services = Array.isArray(data.services) ? data.services : [];
-        const preferred = [];
-        const fallback = [];
-
-        function pushUnique(target, value) {
-          const base = normalizeBaseUrl(value);
-          if (!base) {
+    async function waitForHealth(baseUrl) {
+      const deadline = Date.now() + config.readyTimeoutMs;
+      const normalized = normalizeBase(baseUrl);
+      while (Date.now() < deadline) {
+        try {
+          const resp = await fetch(`${normalized}/health`, { cache: "no-store" });
+          if (resp.ok) {
             return;
           }
-          if (!target.includes(base)) {
-            target.push(base);
-          }
+        } catch (_) {
+          // ignore
         }
+        await sleep(config.pollMs);
+      }
+      throw new Error("等待后端就绪超时");
+    }
 
-        for (const service of services) {
-          const remotePorts = Array.isArray(service.remote_ports)
-            ? service.remote_ports
-            : (Array.isArray(service.remotePorts) ? service.remotePorts : []);
-
-          pushUnique(fallback, service.url);
-          pushUnique(fallback, service.service_url);
-          pushUnique(fallback, service.serviceUrl);
-
-          for (const portItem of remotePorts) {
-            const url = normalizeBaseUrl(
-              portItem.url || portItem.external_url || portItem.externalUrl || portItem.host_url || portItem.hostUrl
-            );
-            if (!url) {
-              continue;
-            }
-
-            const servicePort = Number(
-              portItem.service_port ?? portItem.servicePort ?? portItem.target_port ?? portItem.targetPort
-            );
-            if (Number.isFinite(servicePort) && servicePort === Number(OPEN_API.servicePort)) {
-              pushUnique(preferred, url);
-            } else {
-              pushUnique(fallback, url);
-            }
-          }
-        }
-
-        return preferred.concat(fallback).filter((v, idx, arr) => arr.indexOf(v) === idx);
+    async function ensureSession() {
+      if (state.sessionId) {
+        return state.sessionId;
       }
 
-      function extractTaskServiceBaseUrl(detailPayload) {
-        const urls = extractTaskServiceBaseUrls(detailPayload);
-        return urls[0] || "";
+      const resp = await fetch(`${state.runtimeApiBase}/create_session`, { method: "POST" });
+      const data = await parseJsonSafe(resp);
+      if (!resp.ok || !data || !data.session_id) {
+        throw new Error((data && data.detail) || "创建会话失败");
       }
 
-      function getCurrentOriginBase() {
-        if (!window.location || !/^https?:$/i.test(window.location.protocol)) {
-          return "";
-        }
-        const origin = normalizeBaseUrl(window.location.origin);
-        if (!origin || origin.includes("openapi.suanli.cn")) {
-          return "";
-        }
-        return origin;
+      state.sessionId = data.session_id;
+      appendLog(`session_id=${state.sessionId}`);
+      return state.sessionId;
+    }
+
+    async function uploadInput(endpoint, file, label) {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("session_id", state.sessionId);
+
+      const resp = await fetch(`${state.runtimeApiBase}/${endpoint}`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await parseJsonSafe(resp);
+      if (!resp.ok) {
+        throw new Error((data && data.detail) || `${label} 上传失败`);
+      }
+      return data || {};
+    }
+
+    async function uploadSelectedInputs() {
+      const dataset = dom.datasetFile.files[0];
+      const model = dom.modelFile.files[0];
+      const pose = dom.poseFile.files[0];
+
+      if (dataset) {
+        dom.datasetStatus.textContent = "上传中...";
+        const data = await uploadInput("upload_dataset", dataset, "数据集");
+        state.datasetOssKey = data.dataset_oss_key || state.datasetOssKey;
+        dom.datasetStatus.textContent = state.datasetOssKey ? `已上传: ${state.datasetOssKey}` : "上传完成";
+        appendLog(`数据集已上传到 OSS: ${state.datasetOssKey}`);
       }
 
-      async function checkBackendHealth(base, timeoutMs = 6000) {
-        const normalizedBase = normalizeBaseUrl(base);
-        if (!normalizedBase) {
-          return false;
+      if (model) {
+        dom.modelStatus.textContent = "上传中...";
+        const data = await uploadInput("upload_model", model, "模型");
+        state.modelOssKey = data.model_oss_key || state.modelOssKey;
+        dom.modelStatus.textContent = state.modelOssKey ? `已上传: ${state.modelOssKey}` : "上传完成";
+        appendLog(`模型已上传到 OSS: ${state.modelOssKey}`);
+      }
+
+      if (dom.enablePose.checked) {
+        if (pose) {
+          dom.poseStatus.textContent = "上传中...";
+          const data = await uploadInput("upload_pose", pose, "Pose");
+          state.poseOssKey = data.pose_oss_key || state.poseOssKey;
+          dom.poseStatus.textContent = state.poseOssKey ? `已上传: ${state.poseOssKey}` : "上传完成";
+          appendLog(`Pose 已上传到 OSS: ${state.poseOssKey}`);
         }
-        const controller = new AbortController();
-        const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+        if (!state.poseOssKey) {
+          throw new Error("已启用 Pose 渲染，但未提供可用的 Pose JSON");
+        }
+      }
+
+      if (!dom.renderOnly.checked && !state.datasetOssKey) {
+        throw new Error("训练模式需要数据集 ZIP（请先选择并上传）");
+      }
+
+      if (dom.renderOnly.checked && !state.modelOssKey) {
+        throw new Error("仅渲染模式需要模型 ZIP（请先选择并上传）");
+      }
+    }
+
+    function startLogPolling() {
+      stopLogPolling();
+      state.logTimer = setInterval(async () => {
+        if (!state.runtimeApiBase || !state.sessionId) {
+          return;
+        }
         try {
-          const response = await fetch(`${normalizedBase}/health`, {
-            cache: "no-store",
-            signal: controller.signal,
-          });
-          return response.ok;
-        } catch (error) {
-          return false;
-        } finally {
-          window.clearTimeout(timer);
-        }
-      }
-
-      function collectProbeBases(detailPayload) {
-        const candidates = [];
-
-        function pushUnique(base) {
-          const normalized = normalizeBaseUrl(base);
-          if (!normalized) {
-            return;
-          }
-          if (!candidates.includes(normalized)) {
-            candidates.push(normalized);
-          }
-        }
-
-        pushUnique(runtimeApiBase);
-        if (detailPayload) {
-          for (const base of extractTaskServiceBaseUrls(detailPayload)) {
-            pushUnique(base);
-          }
-        }
-        pushUnique(getCurrentOriginBase());
-        return candidates;
-      }
-
-      function buildOpenApiHeaders() {
-        return {
-          "Content-Type": "application/json",
-          token: OPEN_API.token,
-          timestamp: String(Date.now()),
-          version: OPEN_API.version,
-        };
-      }
-
-      function buildOpenApiGetHeaders() {
-        return {
-          token: OPEN_API.token,
-          timestamp: String(Date.now()),
-          version: OPEN_API.version,
-        };
-      }
-
-      async function callTaskDetailApi() {
-        const response = await fetch(
-          `${OPEN_API.base}/api/deployment/task/detail?task_id=${encodeURIComponent(String(OPEN_API.taskId))}`,
-          {
-            method: "GET",
-            headers: buildOpenApiGetHeaders(),
-            cache: "no-store",
-          }
-        );
-
-        let payload = null;
-        try {
-          payload = await response.json();
-        } catch (error) {
-          payload = null;
-        }
-
-        if (!response.ok) {
-          const detail = extractPayloadMessage(payload) || `HTTP ${response.status}`;
-          throw new Error(`detail 请求失败：${detail}`);
-        }
-
-        if (!isApiSuccess(payload)) {
-          const message = extractPayloadMessage(payload) || `业务码 ${payload && payload.code ? payload.code : "unknown"}`;
-          throw new Error(`detail 失败：${message}`);
-        }
-
-        return payload;
-      }
-
-      async function callTaskControlApi(action) {
-        const actionPath = action === "recover" ? "recover" : "pause";
-        const response = await fetch(`${OPEN_API.base}/api/deployment/task/${actionPath}`, {
-          method: "POST",
-          headers: buildOpenApiHeaders(),
-          body: JSON.stringify({ task_id: OPEN_API.taskId }),
-        });
-
-        let payload = null;
-        try {
-          payload = await response.json();
-        } catch (error) {
-          payload = null;
-        }
-
-        if (!response.ok) {
-          const detail = extractPayloadMessage(payload) || `HTTP ${response.status}`;
-          throw new Error(`${actionPath} 请求失败：${detail}`);
-        }
-
-        if (!isApiSuccess(payload)) {
-          const message = extractPayloadMessage(payload) || `业务码 ${payload && payload.code ? payload.code : "unknown"}`;
-          if (action === "recover" && isRecoverAlreadyRunning(message)) {
-            return payload;
-          }
-          throw new Error(`${actionPath} 失败：${message}`);
-        }
-
-        return payload;
-      }
-
-      async function waitForWorkerReady(timeoutMs = OPEN_API.readyTimeoutMs, intervalMs = 2000) {
-        const deadline = Date.now() + timeoutMs;
-        let lastStatus = "";
-        let lastBase = "";
-        let lastDetailError = "";
-        while (Date.now() < deadline) {
-          let detailPayload = null;
-          try {
-            detailPayload = await callTaskDetailApi();
-            const status = extractTaskStatus(detailPayload);
-            if (status) {
-              lastStatus = status;
-            }
-          } catch (error) {
-            lastDetailError = error && error.message ? error.message : String(error || "");
-          }
-
-          const probeBases = collectProbeBases(detailPayload);
-          for (const baseToCheck of probeBases) {
-            lastBase = baseToCheck;
-            const healthy = await checkBackendHealth(baseToCheck);
-            if (healthy) {
-              runtimeApiBase = baseToCheck;
-              return baseToCheck;
-            }
-          }
-          await sleep(intervalMs);
-        }
-        const detailSuffix = lastDetailError ? `，detail错误：${lastDetailError}` : "";
-        throw new Error(
-          `任务恢复超时，后端尚未就绪。最后状态：${lastStatus || "unknown"}，最后地址：${lastBase || runtimeApiBase || "none"}${detailSuffix}`
-        );
-      }
-
-      async function ensureBackendReady() {
-        if (backendReadyPromise) {
-          return backendReadyPromise;
-        }
-
-        backendReadyPromise = (async () => {
-          setRunStatus("检查远程任务状态");
-          let status = "";
-          let detailOk = false;
-          let recovered = false;
-
-          try {
-            const detail = await callTaskDetailApi();
-            detailOk = true;
-            status = extractTaskStatus(detail);
-            const fromDetailBase = extractTaskServiceBaseUrl(detail);
-            if (fromDetailBase) {
-              runtimeApiBase = fromDetailBase;
-            }
-          } catch (error) {
-            appendLog(`detail 检查失败，尝试直接探活后端：${error.message || error}`);
-          }
-
-          if (detailOk && !isRunningStatus(status)) {
-            setRunStatus("任务未运行，执行恢复");
-            await callTaskControlApi("recover");
-            recovered = true;
-          }
-
-          const base = await waitForWorkerReady();
-          return { base, recovered };
-        })().finally(() => {
-          backendReadyPromise = null;
-        });
-
-        return backendReadyPromise;
-      }
-
-      async function ensureSession(base) {
-        if (sessionId) {
-          return sessionId;
-        }
-        const res = await fetch(`${base}/create_session`, { method: "POST" });
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.detail || "创建会话失败");
-        }
-        sessionId = data.session_id || "";
-        return sessionId;
-      }
-
-      function startLogPolling(base) {
-        stopLogPolling();
-        logTimer = setInterval(async () => {
-          if (!sessionId) {
-            return;
-          }
-          try {
-            const res = await fetch(`${base}/logs?max_lines=300&session_id=${encodeURIComponent(sessionId)}`);
-            const data = await res.json();
-            if (data.log !== undefined) {
-              logBox.value = data.log;
-              logBox.scrollTop = logBox.scrollHeight;
-            }
-          } catch (err) {
-            // ignore
-          }
-        }, 2000);
-      }
-
-      function stopLogPolling() {
-        if (logTimer) {
-          clearInterval(logTimer);
-          logTimer = null;
-        }
-      }
-
-      function startElapsed() {
-        startTime = Date.now();
-        if (elapsedTimer) {
-          clearInterval(elapsedTimer);
-        }
-        elapsedTimer = setInterval(() => {
-          const diff = Math.floor((Date.now() - startTime) / 1000);
-          const mins = String(Math.floor(diff / 60)).padStart(2, "0");
-          const secs = String(diff % 60).padStart(2, "0");
-          elapsed.textContent = `已用时间：${mins}:${secs}`;
-        }, 1000);
-      }
-
-      function stopElapsed() {
-        if (elapsedTimer) {
-          clearInterval(elapsedTimer);
-          elapsedTimer = null;
-        }
-      }
-
-      function applyQueueStatus(status) {
-        if (!status) {
-          return;
-        }
-
-        if (status.status === "processing" || status.position === 0) {
-          setQueueStatus("处理中");
-          return;
-        }
-
-        if (status.status === "pending") {
-          const position = typeof status.position === "number" ? status.position : -1;
-          if (position > 0) {
-            const ahead = Math.max(0, position - 1);
-            setQueueStatus(`排队中（前面还有 ${ahead} 个任务）`);
-          } else {
-            setQueueStatus("排队中");
-          }
-          return;
-        }
-
-        if (status.status === "completed") {
-          setQueueStatus("已完成");
-          return;
-        }
-
-        if (status.status === "failed") {
-          setQueueStatus("失败");
-          return;
-        }
-
-        setQueueStatus("待机");
-      }
-
-      function saveBlob(blob, filename) {
-        if (outputDirHandle && window.showDirectoryPicker) {
-          return outputDirHandle.getFileHandle(filename, { create: true }).then((fileHandle) =>
-            fileHandle.createWritable().then((writable) => writable.write(blob).then(() => writable.close()))
+          const resp = await fetch(
+            `${state.runtimeApiBase}/logs?session_id=${encodeURIComponent(state.sessionId)}&max_lines=400`,
+            { cache: "no-store" },
           );
+          const data = await parseJsonSafe(resp);
+          if (resp.ok && data && typeof data.log === "string") {
+            dom.logBox.textContent = data.log;
+            dom.logBox.scrollTop = dom.logBox.scrollHeight;
+          }
+        } catch (_) {
+          // ignore polling error
+        }
+      }, config.pollMs);
+    }
+
+    function stopLogPolling() {
+      if (state.logTimer) {
+        clearInterval(state.logTimer);
+        state.logTimer = null;
+      }
+    }
+
+    function applyQueueStatus(payload) {
+      if (!payload) {
+        return;
+      }
+      if (payload.status === "processing" || payload.position === 0) {
+        setQueueStatus("处理中", "warn");
+        return;
+      }
+      if (payload.status === "pending") {
+        const position = Number(payload.position || 1);
+        const ahead = Math.max(0, position - 1);
+        setQueueStatus(`排队中（前方 ${ahead} 个）`, "warn");
+        return;
+      }
+      if (payload.status === "completed") {
+        setQueueStatus("已完成", "ok");
+        return;
+      }
+      if (payload.status === "failed") {
+        setQueueStatus("失败", "err");
+        return;
+      }
+      setQueueStatus("待机");
+    }
+
+    function clearResultUI() {
+      dom.downloadLinks.innerHTML = "";
+      dom.videoWrap.classList.add("hidden");
+      dom.videoPreview.removeAttribute("src");
+      dom.posePreview.style.display = "none";
+      dom.posePreview.removeAttribute("src");
+      clearPlyViewer("任务完成后将在此预览 OSS 返回的 PLY 点云。");
+    }
+
+    function setLinksFromArtifacts(artifacts) {
+      dom.downloadLinks.innerHTML = "";
+      const items = [
+        ["PLY 点云", artifacts && artifacts.ply],
+        ["360 视频", artifacts && artifacts.video],
+        ["Pose 渲染图", artifacts && artifacts.pose],
+        ["结果打包 ZIP", artifacts && artifacts.bundle],
+        ["训练日志", artifacts && artifacts.log],
+      ];
+
+      let hasAny = false;
+      for (const [label, meta] of items) {
+        if (!meta || !meta.url) {
+          continue;
+        }
+        hasAny = true;
+        const a = document.createElement("a");
+        a.href = meta.url;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.textContent = `${label}`;
+        dom.downloadLinks.appendChild(a);
+      }
+
+      if (!hasAny) {
+        const span = document.createElement("span");
+        span.style.color = "var(--text-soft)";
+        span.style.fontSize = "0.84rem";
+        span.textContent = "暂无可下载结果";
+        dom.downloadLinks.appendChild(span);
+      }
+
+      if (artifacts && artifacts.video && artifacts.video.url) {
+        dom.videoPreview.src = artifacts.video.url;
+        dom.videoWrap.classList.remove("hidden");
+      } else {
+        dom.videoWrap.classList.add("hidden");
+        dom.videoPreview.removeAttribute("src");
+      }
+
+      if (artifacts && artifacts.pose && artifacts.pose.url) {
+        dom.posePreview.src = artifacts.pose.url;
+        dom.posePreview.style.display = "block";
+      } else {
+        dom.posePreview.style.display = "none";
+        dom.posePreview.removeAttribute("src");
+      }
+    }
+
+    async function pollRequestUntilDone(requestId) {
+      while (true) {
+        const qResp = await fetch(
+          `${state.runtimeApiBase}/queue_status?request_id=${encodeURIComponent(requestId)}`,
+          { cache: "no-store" },
+        );
+        const qData = await parseJsonSafe(qResp);
+        if (qResp.ok) {
+          applyQueueStatus(qData);
         }
 
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
-        return Promise.resolve();
-      }
+        const sResp = await fetch(
+          `${state.runtimeApiBase}/request_status?request_id=${encodeURIComponent(requestId)}`,
+          { cache: "no-store" },
+        );
+        const sData = await parseJsonSafe(sResp);
+        if (!sResp.ok) {
+          throw new Error((sData && sData.detail) || "读取 request_status 失败");
+        }
 
-      function fetchDownloadBlob(base, sessionIdValue) {
-        return new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open("GET", `${base}/download_selected?session_id=${encodeURIComponent(sessionIdValue)}`);
-          xhr.responseType = "blob";
-          xhr.onprogress = (evt) => {
-            if (evt.lengthComputable) {
-              const percent = Math.round((evt.loaded / evt.total) * 100);
-              downloadProgress.value = percent;
-            }
-          };
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(xhr.response);
-              return;
-            }
-            reject(new Error(`下载失败: HTTP ${xhr.status}`));
-          };
-          xhr.onerror = () => reject(new Error("下载失败"));
-          xhr.send();
-        });
-      }
+        if (sData.status === "completed") {
+          return sData;
+        }
+        if (sData.status === "failed") {
+          throw new Error(sData.error || "任务执行失败");
+        }
 
-      async function prefetchDownloadBlob(base) {
-        const prepareRes = await fetch(`${base}/prepare_download`, {
+        await sleep(config.pollMs);
+      }
+    }
+
+    async function runTaskWorkflow() {
+      dom.runBtn.disabled = true;
+      let recoveredByThisRun = false;
+      let paused = false;
+
+      try {
+        clearResultUI();
+        setRunStatus("恢复算力任务中", "warn");
+        setQueueStatus("准备中", "warn");
+
+        const recoverData = await tmRecover();
+        state.runtimeApiBase = normalizeBase(recoverData.service_url || "");
+        recoveredByThisRun = Boolean(recoverData.recovered);
+
+        if (!state.runtimeApiBase) {
+          throw new Error("recover 返回的 service_url 为空");
+        }
+
+        appendLog(`任务恢复完成: recovered=${recoverData.recovered}, service_url=${state.runtimeApiBase}`);
+
+        setRunStatus("等待后端健康检查", "warn");
+        await waitForHealth(state.runtimeApiBase);
+        appendLog("后端健康检查通过");
+
+        await ensureSession();
+
+        setRunStatus("上传输入文件到 OSS", "warn");
+        await uploadSelectedInputs();
+
+        const requestId = (window.crypto && window.crypto.randomUUID)
+          ? window.crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+        const payload = {
+          source_path: state.datasetOssKey || "",
+          model_path: state.modelOssKey || "",
+          iterations: Number(dom.iterations.value || 30000),
+          mult: Number(dom.mult.value || 0.5),
+          white_background: false,
+          eval: false,
+          data_device: "cuda",
+          iteration: -1,
+          video360: dom.video360.checked,
+          use_dataset_cams: dom.useDatasetCams.checked,
+          use_test_cams: false,
+          interp_per_pair: Number(dom.interp.value || 3),
+          loop: false,
+          fps: Number(dom.fps.value || 30),
+          pose_path: dom.enablePose.checked ? (state.poseOssKey || "") : "",
+          frames: 240,
+          ease: true,
+          render_only: dom.renderOnly.checked,
+          session_id: state.sessionId,
+          request_id: requestId,
+        };
+
+        setRunStatus("提交任务到队列", "warn");
+        startLogPolling();
+
+        const runResp = await fetch(`${state.runtimeApiBase}/run`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            session_id: sessionId,
-            include_ply: includePly.checked,
-            include_video: includeVideo.checked,
-            include_pose: includePose.checked,
-          }),
+          body: JSON.stringify(payload),
         });
-
-        const prepareData = await prepareRes.json();
-        if (!prepareRes.ok) {
-          throw new Error(prepareData.detail || "打包失败");
+        const runData = await parseJsonSafe(runResp);
+        if (!runResp.ok) {
+          throw new Error((runData && runData.detail) || "任务提交失败");
         }
 
-        setRunStatus("打包中");
-        let status = "packaging";
-        for (let i = 0; i < 180; i += 1) {
-          await sleep(2000);
-          const statusRes = await fetch(`${base}/package_status?session_id=${encodeURIComponent(sessionId)}`);
-          const statusData = await statusRes.json();
-          status = statusData.status;
-          if (status === "ready") {
-            break;
+        appendLog(`任务已入队: request_id=${runData.request_id}, position=${runData.position}`);
+        setRunStatus("任务执行中", "warn");
+
+        const resultData = await pollRequestUntilDone(requestId);
+        const artifacts = (resultData.result && resultData.result.artifacts) || null;
+
+        setLinksFromArtifacts(artifacts);
+
+        if (artifacts && artifacts.ply && artifacts.ply.url) {
+          try {
+            setRunStatus("加载 PLY 预览", "warn");
+            await loadPlyToViewer(artifacts.ply.url);
+          } catch (previewError) {
+            appendLog(`PLY 预览失败: ${previewError.message}`);
           }
-          if (status === "error") {
-            throw new Error(statusData.error || "打包失败");
-          }
-        }
-
-        if (status !== "ready") {
-          throw new Error("打包超时，请稍后重试");
-        }
-
-        downloadProgress.value = 0;
-        const blob = await fetchDownloadBlob(base, sessionId);
-        const filename = (localOutputName.value || "fastgs_output.zip").trim() || "fastgs_output.zip";
-        cachedDownloadBlob = blob;
-        cachedDownloadName = filename;
-        setRunStatus("输出已缓存，可下载");
-      }
-
-      async function maybePauseTaskIfIdle(reason = "") {
-        try {
-          const statusRes = await fetch(`${runtimeApiBase}/queue_status`, { cache: "no-store" });
-          const queue = await statusRes.json();
-          const hasPending = Number(queue.pending || 0) > 0;
-          const hasProcessing = Boolean(queue.processing);
-          if (hasPending || hasProcessing) {
-            appendLog(`跳过暂停：队列仍有任务（${reason}）`);
-            return;
-          }
-
-          await callTaskControlApi("pause");
-          appendLog("任务已暂停。");
-        } catch (error) {
-          appendLog(`暂停任务失败: ${error.message}`);
-        }
-      }
-
-      async function uploadDataset() {
-        const file = datasetZipInput.files[0];
-        if (!file) {
-          datasetUploadStatus.textContent = "请选择 zip 文件";
-          return;
-        }
-
-        datasetUploading = true;
-        datasetUploaded = false;
-        datasetUploadStatus.textContent = "上传中...";
-        datasetProgress.value = 0;
-
-        try {
-          const ready = await ensureBackendReady();
-          const base = ready.base;
-          await ensureSession(base);
-
-          const formData = new FormData();
-          formData.append("file", file);
-          formData.append("dataset_name", "dataset");
-          formData.append("session_id", sessionId);
-
-          await new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open("POST", `${base}/upload_dataset`);
-            xhr.upload.onprogress = (evt) => {
-              if (evt.lengthComputable) {
-                const percent = Math.round((evt.loaded / evt.total) * 100);
-                datasetProgress.value = percent;
-              }
-            };
-            xhr.onload = () => {
-              try {
-                const data = JSON.parse(xhr.responseText || "{}");
-                if (xhr.status >= 200 && xhr.status < 300) {
-                  datasetUploadStatus.textContent = "上传成功";
-                  datasetUploaded = true;
-                  appendLog(`数据集上传完成: ${data.dataset_path || ""}`);
-                  resolve();
-                } else {
-                  reject(new Error(data.detail || "上传失败"));
-                }
-              } catch (error) {
-                reject(new Error("上传失败"));
-              }
-            };
-            xhr.onerror = () => reject(new Error("上传失败"));
-            xhr.send(formData);
-          });
-        } catch (error) {
-          datasetUploadStatus.textContent = error.message || "上传失败";
-          appendLog(`数据集上传失败: ${error.message}`);
-        } finally {
-          datasetUploading = false;
-        }
-      }
-
-      async function uploadModel() {
-        const file = modelZipInput.files[0];
-        if (!file) {
-          modelUploadStatus.textContent = "请选择 zip 文件";
-          return;
-        }
-
-        modelUploadStatus.textContent = "上传中...";
-
-        try {
-          const ready = await ensureBackendReady();
-          const base = ready.base;
-          await ensureSession(base);
-
-          const formData = new FormData();
-          formData.append("file", file);
-          formData.append("model_name", "model");
-          formData.append("session_id", sessionId);
-
-          const res = await fetch(`${base}/upload_model`, {
-            method: "POST",
-            body: formData,
-          });
-          const data = await res.json();
-          if (!res.ok) {
-            throw new Error(data.detail || "上传失败");
-          }
-
-          modelUploadStatus.textContent = "上传成功";
-          renderOnly.checked = true;
-          appendLog(`模型上传完成: ${data.model_path || ""}`);
-        } catch (error) {
-          modelUploadStatus.textContent = error.message || "上传失败";
-          appendLog(`模型上传失败: ${error.message}`);
-        }
-      }
-
-      async function uploadPose() {
-        const file = poseFileInput.files[0];
-        if (!file) {
-          poseUploadStatus.textContent = "请选择 json 文件";
-          return;
-        }
-
-        poseUploadStatus.textContent = "上传中...";
-
-        try {
-          const ready = await ensureBackendReady();
-          const base = ready.base;
-          await ensureSession(base);
-
-          const formData = new FormData();
-          formData.append("file", file);
-          formData.append("session_id", sessionId);
-
-          const res = await fetch(`${base}/upload_pose`, {
-            method: "POST",
-            body: formData,
-          });
-          const data = await res.json();
-          if (!res.ok) {
-            throw new Error(data.detail || "上传失败");
-          }
-
-          posePathInput.value = data.pose_path || "";
-          poseUploadStatus.textContent = "上传成功";
-          appendLog(`Pose 上传完成: ${posePathInput.value}`);
-        } catch (error) {
-          poseUploadStatus.textContent = error.message || "上传失败";
-          appendLog(`Pose 上传失败: ${error.message}`);
-        }
-      }
-
-      async function renderPose() {
-        const posePath = posePathInput.value.trim();
-        if (!posePath) {
-          poseUploadStatus.textContent = "请先上传或填写 pose 路径";
-          return;
-        }
-
-        try {
-          const ready = await ensureBackendReady();
-          const base = ready.base;
-          await ensureSession(base);
-
-          poseUploadStatus.textContent = "渲染中...";
-          const res = await fetch(`${base}/render_pose_session`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              session_id: sessionId,
-              pose_path: posePath,
-            }),
-          });
-          const data = await res.json();
-          if (!res.ok) {
-            throw new Error(data.detail || "渲染失败");
-          }
-
-          poseUploadStatus.textContent = "渲染完成";
-          appendLog(`Pose 渲染完成: ${data.pose_path || ""}`);
-        } catch (error) {
-          poseUploadStatus.textContent = error.message || "渲染失败";
-          appendLog(`Pose 渲染失败: ${error.message}`);
-        }
-      }
-
-      async function runTask() {
-        if (datasetUploading) {
-          appendLog("数据集上传中，请稍后...");
-          return;
-        }
-
-        if (!datasetUploaded && !renderOnly.checked) {
-          appendLog("请先上传数据集，或启用仅渲染模式。");
-          return;
-        }
-
-        cachedDownloadBlob = null;
-        cachedDownloadName = "";
-        currentRequestId = "";
-
-        let recoveredByThisRun = false;
-
-        try {
-          const ready = await ensureBackendReady();
-          const base = ready.base;
-          recoveredByThisRun = ready.recovered;
-          await ensureSession(base);
-
-          const requestId = (window.crypto && window.crypto.randomUUID)
-            ? window.crypto.randomUUID()
-            : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-          currentRequestId = requestId;
-
-          const payload = {
-            source_path: "",
-            model_path: "",
-            iterations: Number(iterationsInput.value || 30000),
-            mult: 0.5,
-            white_background: false,
-            eval: false,
-            data_device: "cuda",
-            iteration: -1,
-            video360: video360.checked,
-            use_dataset_cams: useDatasetCams.checked,
-            use_test_cams: false,
-            interp_per_pair: Number(interpPerPair.value || 3),
-            loop: false,
-            fps: Number(fpsInput.value || 30),
-            pose_path: poseEnable.checked ? posePathInput.value.trim() : "",
-            frames: 240,
-            ease: true,
-            render_only: renderOnly.checked,
-            session_id: sessionId,
-            request_id: requestId,
-          };
-
-          setRunStatus("任务已提交");
-          setQueueStatus("排队状态查询中");
-          startLogPolling(base);
-          startElapsed();
-
-          const runRes = await fetch(`${base}/run`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          const runData = await runRes.json();
-          if (!runRes.ok) {
-            throw new Error(runData.detail || "任务提交失败");
-          }
-
-          let done = false;
-          while (!done) {
-            const qRes = await fetch(`${base}/queue_status?request_id=${encodeURIComponent(requestId)}`, {
-              cache: "no-store",
-            });
-            const qData = await qRes.json();
-            applyQueueStatus(qData);
-
-            const sRes = await fetch(`${base}/request_status?request_id=${encodeURIComponent(requestId)}`, {
-              cache: "no-store",
-            });
-            const sData = await sRes.json();
-            if (!sRes.ok) {
-              throw new Error(sData.detail || "读取任务状态失败");
-            }
-
-            if (sData.status === "completed") {
-              done = true;
-              setRunStatus("任务完成，正在预打包下载");
-              break;
-            }
-
-            if (sData.status === "failed") {
-              throw new Error(sData.error || "任务失败");
-            }
-
-            await sleep(2000);
-          }
-
-          await prefetchDownloadBlob(base);
-          await maybePauseTaskIfIdle("运行完成");
-          setRunStatus("完成");
-          appendLog("任务完成。可点击“下载输出”保存文件。");
-        } catch (error) {
-          setRunStatus(`失败: ${error.message}`);
-          appendLog(`运行失败: ${error.message}`);
-          if (recoveredByThisRun && runtimeApiBase) {
-            await maybePauseTaskIfIdle("失败兜底");
-          }
-        } finally {
-          stopElapsed();
-          stopLogPolling();
-        }
-      }
-
-      async function downloadOutput() {
-        const filename = (localOutputName.value || "fastgs_output.zip").trim() || "fastgs_output.zip";
-
-        try {
-          if (cachedDownloadBlob) {
-            await saveBlob(cachedDownloadBlob, filename || cachedDownloadName || "fastgs_output.zip");
-            appendLog("已从前端缓存下载输出。\n");
-            return;
-          }
-
-          const ready = await ensureBackendReady();
-          const base = ready.base;
-          await ensureSession(base);
-
-          await prefetchDownloadBlob(base);
-          if (!cachedDownloadBlob) {
-            throw new Error("输出缓存失败");
-          }
-
-          await saveBlob(cachedDownloadBlob, filename);
-          appendLog("下载完成。");
-
-          if (ready.recovered) {
-            await maybePauseTaskIfIdle("下载完成");
-          }
-        } catch (error) {
-          appendLog(`下载失败: ${error.message}`);
-        }
-      }
-
-      uploadDatasetBtn.addEventListener("click", uploadDataset);
-      uploadModelBtn.addEventListener("click", uploadModel);
-      uploadPoseBtn.addEventListener("click", uploadPose);
-      renderPoseBtn.addEventListener("click", renderPose);
-      runBtn.addEventListener("click", runTask);
-      downloadBtn.addEventListener("click", downloadOutput);
-
-      pickOutputDirBtn.addEventListener("click", async () => {
-        if (window.showDirectoryPicker) {
-          outputDirHandle = await window.showDirectoryPicker();
-          outputDirStatus.textContent = "已选择输出目录";
         } else {
-          outputDirStatus.textContent = "浏览器不支持目录选择";
+          clearPlyViewer("未找到可预览的 PLY 输出");
         }
-      });
 
-      window.addEventListener("beforeunload", () => {
-        if (!sessionId || !runtimeApiBase) {
+        setRunStatus("任务完成，正在暂停算力任务", "warn");
+        await tmPause();
+        paused = true;
+
+        setRunStatus("完成（任务已暂停）", "ok");
+        setQueueStatus("已完成", "ok");
+        appendLog("任务完成，结果已上传 OSS，算力任务已暂停。");
+
+      } catch (error) {
+        const message = error && error.message ? error.message : String(error || "未知错误");
+        setRunStatus(`失败: ${message}`, "err");
+        setQueueStatus("失败", "err");
+        appendLog(`运行失败: ${message}`);
+      } finally {
+        stopLogPolling();
+        if (recoveredByThisRun && !paused) {
+          try {
+            await tmPause();
+            appendLog("失败兜底：已自动暂停任务。");
+          } catch (pauseErr) {
+            appendLog(`失败兜底暂停失败: ${pauseErr.message}`);
+          }
+        }
+        dom.runBtn.disabled = false;
+      }
+    }
+
+    dom.runBtn.addEventListener("click", runTaskWorkflow);
+
+    dom.pauseBtn.addEventListener("click", async () => {
+      try {
+        await tmPause();
+        appendLog("手动暂停成功。");
+        setRunStatus("任务已暂停", "ok");
+      } catch (error) {
+        appendLog(`手动暂停失败: ${error.message}`);
+      }
+    });
+
+    dom.clearBtn.addEventListener("click", () => {
+      dom.logBox.textContent = "";
+      clearResultUI();
+      setRunStatus("就绪");
+      setQueueStatus("待机");
+    });
+
+    dom.datasetFile.addEventListener("change", () => {
+      state.datasetOssKey = "";
+      dom.datasetStatus.textContent = dom.datasetFile.files[0] ? "已选择文件，待上传" : "未上传";
+    });
+
+    dom.modelFile.addEventListener("change", () => {
+      state.modelOssKey = "";
+      dom.modelStatus.textContent = dom.modelFile.files[0] ? "已选择文件，待上传" : "未上传";
+    });
+
+    dom.poseFile.addEventListener("change", () => {
+      state.poseOssKey = "";
+      dom.poseStatus.textContent = dom.poseFile.files[0] ? "已选择文件，待上传" : "未上传";
+    });
+
+    window.addEventListener("beforeunload", () => {
+      if (!state.runtimeApiBase || !state.sessionId) {
+        return;
+      }
+      const formData = new FormData();
+      formData.append("session_id", state.sessionId);
+      navigator.sendBeacon(`${state.runtimeApiBase}/cleanup`, formData);
+    });
+
+    // ----------------------------------------------------------------------
+    // PLY Viewer (Three.js)
+    // ----------------------------------------------------------------------
+    const SH_C0 = 0.28209479177387814;
+    let renderer = null;
+    let scene = null;
+    let camera = null;
+    let controls = null;
+    let pointsObj = null;
+    let resizeObserver = null;
+    let rafId = 0;
+
+    function buildColorsFromSphericalHarmonics(geometry) {
+      const sh0 = geometry.getAttribute("f_dc_0");
+      const sh1 = geometry.getAttribute("f_dc_1");
+      const sh2 = geometry.getAttribute("f_dc_2");
+      if (!sh0 || !sh1 || !sh2) {
+        return null;
+      }
+
+      const count = sh0.count;
+      const colors = new Float32Array(count * 3);
+      for (let i = 0; i < count; i += 1) {
+        colors[i * 3 + 0] = THREE.MathUtils.clamp(0.5 + SH_C0 * sh0.getX(i), 0, 1);
+        colors[i * 3 + 1] = THREE.MathUtils.clamp(0.5 + SH_C0 * sh1.getX(i), 0, 1);
+        colors[i * 3 + 2] = THREE.MathUtils.clamp(0.5 + SH_C0 * sh2.getX(i), 0, 1);
+      }
+      return new THREE.Float32BufferAttribute(colors, 3);
+    }
+
+    function fitCameraToObject(box) {
+      if (!box || box.isEmpty()) {
+        return;
+      }
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z, 0.01);
+      const distance = maxDim * 1.9;
+
+      camera.position.set(center.x + distance, center.y + distance * 0.6, center.z + distance);
+      camera.near = Math.max(distance / 1200, 0.01);
+      camera.far = Math.max(distance * 80, 100);
+      camera.updateProjectionMatrix();
+
+      controls.target.copy(center);
+      controls.update();
+    }
+
+    function ensureViewer() {
+      if (renderer) {
+        return;
+      }
+
+      const width = Math.max(dom.plyHost.clientWidth || 1, 1);
+      const height = Math.max(dom.plyHost.clientHeight || 1, 1);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(width, height, false);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.domElement.style.width = "100%";
+      renderer.domElement.style.height = "100%";
+      dom.plyHost.appendChild(renderer.domElement);
+
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(45, width / height, 0.01, 5000);
+      camera.position.set(0, 0, 3);
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.06;
+      controls.rotateSpeed = 0.9;
+      controls.zoomSpeed = 0.9;
+      controls.panSpeed = 0.7;
+
+      const hemi = new THREE.HemisphereLight(0xffffff, 0x3a4a5f, 0.95);
+      scene.add(hemi);
+      const key = new THREE.DirectionalLight(0xffffff, 0.8);
+      key.position.set(3, 4, 2);
+      scene.add(key);
+
+      const resize = () => {
+        if (!renderer || !camera) {
           return;
         }
-        const formData = new FormData();
-        formData.append("session_id", sessionId);
-        navigator.sendBeacon(`${runtimeApiBase}/cleanup`, formData);
+        const w = Math.max(dom.plyHost.clientWidth || 1, 1);
+        const h = Math.max(dom.plyHost.clientHeight || 1, 1);
+        renderer.setSize(w, h, false);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      };
+
+      resizeObserver = new ResizeObserver(resize);
+      resizeObserver.observe(dom.plyHost);
+      window.addEventListener("resize", resize);
+
+      const animate = () => {
+        rafId = requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      };
+      animate();
+    }
+
+    function clearPlyViewer(message) {
+      dom.plyPlaceholder.textContent = message;
+      dom.plyPlaceholder.style.display = "flex";
+
+      if (pointsObj && scene) {
+        scene.remove(pointsObj);
+        if (pointsObj.geometry) {
+          pointsObj.geometry.dispose();
+        }
+        if (pointsObj.material) {
+          pointsObj.material.dispose();
+        }
+        pointsObj = null;
+      }
+    }
+
+    async function loadPlyToViewer(url) {
+      ensureViewer();
+      clearPlyViewer("PLY 加载中...");
+
+      const loader = new PLYLoader();
+      if (typeof loader.setCustomPropertyNameMapping === "function") {
+        loader.setCustomPropertyNameMapping({ sh: ["f_dc_0", "f_dc_1", "f_dc_2"] });
+      }
+
+      let geometry = await loader.loadAsync(url);
+
+      if (!geometry.getAttribute("color")) {
+        const shColors = buildColorsFromSphericalHarmonics(geometry);
+        if (shColors) {
+          geometry.setAttribute("color", shColors);
+        }
+      }
+
+      const hasColor = Boolean(geometry.getAttribute("color"));
+      if (!hasColor) {
+        const position = geometry.getAttribute("position");
+        const colors = new Float32Array(position.count * 3);
+        for (let i = 0; i < position.count; i += 1) {
+          colors[i * 3 + 0] = 0.85;
+          colors[i * 3 + 1] = 0.9;
+          colors[i * 3 + 2] = 0.98;
+        }
+        geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+      }
+
+      geometry.computeBoundingBox();
+      const bbox = geometry.boundingBox || new THREE.Box3();
+      const diag = Math.max(bbox.getSize(new THREE.Vector3()).length(), 0.01);
+      const pointSize = THREE.MathUtils.clamp(diag / 900, 0.002, 0.02);
+
+      const material = new THREE.PointsMaterial({
+        size: pointSize,
+        sizeAttenuation: true,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.96,
       });
 
-      setRunStatus("准备就绪");
-      setQueueStatus("待机");
-      appendLog("页面初始化完成。点击上传或运行时将自动恢复远端任务。");
-    </script>
-  </body>
+      if (pointsObj) {
+        scene.remove(pointsObj);
+        pointsObj.geometry.dispose();
+        pointsObj.material.dispose();
+      }
+
+      pointsObj = new THREE.Points(geometry, material);
+      pointsObj.frustumCulled = false;
+      scene.add(pointsObj);
+
+      fitCameraToObject(bbox);
+      dom.plyPlaceholder.style.display = "none";
+    }
+
+    appendLog(`task-manager=${config.taskManager}`);
+    appendLog(`project=${config.project}`);
+    appendLog("就绪。点击“开始运行”后将自动恢复任务、上传输入并提交队列。");
+  </script>
+</body>
 </html>
