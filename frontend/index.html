@@ -338,13 +338,13 @@
         <div class="section">
           <label for="dataset-file">数据集 ZIP（训练模式必填）</label>
           <input id="dataset-file" type="file" accept=".zip" />
-          <div class="status-mini" id="dataset-status">未上传</div>
+          <div class="status-mini" id="dataset-status">未选择</div>
         </div>
 
         <div class="section">
           <label for="model-file">模型 ZIP（仅渲染模式必填）</label>
           <input id="model-file" type="file" accept=".zip" />
-          <div class="status-mini" id="model-status">未上传</div>
+          <div class="status-mini" id="model-status">未选择</div>
         </div>
 
         <div class="section">
@@ -353,7 +353,7 @@
             启用 Pose 渲染（JSON）
           </label>
           <input id="pose-file" type="file" accept=".json" />
-          <div class="status-mini" id="pose-status">未上传</div>
+          <div class="status-mini" id="pose-status">未选择</div>
         </div>
 
         <div class="section">
@@ -388,7 +388,7 @@
               <input id="mult" type="number" min="0.1" step="0.1" value="0.5" />
             </div>
           </div>
-          <div class="hint">运行时会自动上传所选文件到 OSS，再提交任务。</div>
+          <div class="hint">运行时会直接将文件传给后端处理；后端完成后仅上传核心结果到 OSS。</div>
         </div>
 
         <div class="actions">
@@ -491,9 +491,6 @@
     const state = {
       runtimeApiBase: "",
       sessionId: "",
-      datasetOssKey: "",
-      modelOssKey: "",
-      poseOssKey: "",
       logTimer: null,
     };
 
@@ -597,79 +594,59 @@
       return state.sessionId;
     }
 
-    async function uploadInput(endpoint, file, label) {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("session_id", state.sessionId);
+    function buildRunFormData(requestId) {
+      const dataset = dom.datasetFile.files[0] || null;
+      const model = dom.modelFile.files[0] || null;
+      const pose = dom.poseFile.files[0] || null;
+      const renderOnly = dom.renderOnly.checked;
+      const enablePose = dom.enablePose.checked;
 
-      const controller = new AbortController();
-      const timer = window.setTimeout(() => controller.abort(), config.uploadTimeoutMs);
-      try {
-        const resp = await fetch(`${state.runtimeApiBase}/${endpoint}`, {
-          method: "POST",
-          body: formData,
-          signal: controller.signal,
-        });
-        const data = await parseJsonSafe(resp);
-        if (!resp.ok) {
-          throw new Error((data && data.detail) || `${label} 上传失败 (HTTP ${resp.status})`);
-        }
-        return data || {};
-      } catch (error) {
-        if (error && error.name === "AbortError") {
-          const timeoutMin = Math.round(config.uploadTimeoutMs / 60000);
-          throw new Error(`${label} 上传超时（>${timeoutMin} 分钟）`);
-        }
-        throw error;
-      } finally {
-        window.clearTimeout(timer);
+      if (!renderOnly && !dataset) {
+        throw new Error("训练模式需要数据集 ZIP 文件");
       }
-    }
+      if (renderOnly && !model) {
+        throw new Error("仅渲染模式需要模型 ZIP 文件");
+      }
+      if (enablePose && !pose) {
+        throw new Error("已启用 Pose 渲染，请选择 Pose JSON 文件");
+      }
 
-    async function uploadSelectedInputs() {
-      const dataset = dom.datasetFile.files[0];
-      const model = dom.modelFile.files[0];
-      const pose = dom.poseFile.files[0];
+      const formData = new FormData();
+      formData.append("session_id", state.sessionId);
+      formData.append("request_id", requestId);
+      formData.append("iterations", String(Number(dom.iterations.value || 30000)));
+      formData.append("mult", String(Number(dom.mult.value || 0.5)));
+      formData.append("white_background", "false");
+      formData.append("eval", "false");
+      formData.append("data_device", "cuda");
+      formData.append("iteration", "-1");
+      formData.append("video360", String(Boolean(dom.video360.checked)));
+      formData.append("use_dataset_cams", String(Boolean(dom.useDatasetCams.checked)));
+      formData.append("use_test_cams", "false");
+      formData.append("interp_per_pair", String(Number(dom.interp.value || 3)));
+      formData.append("loop", "false");
+      formData.append("fps", String(Number(dom.fps.value || 30)));
+      formData.append("frames", "240");
+      formData.append("ease", "true");
+      formData.append("render_only", String(renderOnly));
 
       if (dataset) {
-        dom.datasetStatus.textContent = "上传中...";
-        appendLog(`开始上传数据集: ${dataset.name} (${(dataset.size / 1024 / 1024).toFixed(2)} MB)`);
-        const data = await uploadInput("upload_dataset", dataset, "数据集");
-        state.datasetOssKey = data.dataset_oss_key || state.datasetOssKey;
-        dom.datasetStatus.textContent = state.datasetOssKey ? `已上传: ${state.datasetOssKey}` : "上传完成";
-        appendLog(`数据集已上传到 OSS: ${state.datasetOssKey}`);
+        appendLog(`附加数据集文件: ${dataset.name} (${(dataset.size / 1024 / 1024).toFixed(2)} MB)`);
+        dom.datasetStatus.textContent = "已附加到任务请求";
+        formData.append("dataset_file", dataset);
       }
-
       if (model) {
-        dom.modelStatus.textContent = "上传中...";
-        appendLog(`开始上传模型: ${model.name} (${(model.size / 1024 / 1024).toFixed(2)} MB)`);
-        const data = await uploadInput("upload_model", model, "模型");
-        state.modelOssKey = data.model_oss_key || state.modelOssKey;
-        dom.modelStatus.textContent = state.modelOssKey ? `已上传: ${state.modelOssKey}` : "上传完成";
-        appendLog(`模型已上传到 OSS: ${state.modelOssKey}`);
+        appendLog(`附加模型文件: ${model.name} (${(model.size / 1024 / 1024).toFixed(2)} MB)`);
+        dom.modelStatus.textContent = "已附加到任务请求";
+        formData.append("model_file", model);
+      }
+      if (enablePose && pose) {
+        appendLog(`附加 Pose 文件: ${pose.name} (${(pose.size / 1024).toFixed(1)} KB)`);
+        dom.poseStatus.textContent = "已附加到任务请求";
+        formData.append("pose_file", pose);
       }
 
-      if (dom.enablePose.checked) {
-        if (pose) {
-          dom.poseStatus.textContent = "上传中...";
-          appendLog(`开始上传 Pose: ${pose.name} (${(pose.size / 1024).toFixed(1)} KB)`);
-          const data = await uploadInput("upload_pose", pose, "Pose");
-          state.poseOssKey = data.pose_oss_key || state.poseOssKey;
-          dom.poseStatus.textContent = state.poseOssKey ? `已上传: ${state.poseOssKey}` : "上传完成";
-          appendLog(`Pose 已上传到 OSS: ${state.poseOssKey}`);
-        }
-        if (!state.poseOssKey) {
-          throw new Error("已启用 Pose 渲染，但未提供可用的 Pose JSON");
-        }
-      }
-
-      if (!dom.renderOnly.checked && !state.datasetOssKey) {
-        throw new Error("训练模式需要数据集 ZIP（请先选择并上传）");
-      }
-
-      if (dom.renderOnly.checked && !state.modelOssKey) {
-        throw new Error("仅渲染模式需要模型 ZIP（请先选择并上传）");
-      }
+      return formData;
     }
 
     function startLogPolling() {
@@ -841,44 +818,32 @@
 
         await ensureSession();
 
-        setRunStatus("上传输入文件到 OSS", "warn");
-        await uploadSelectedInputs();
-
         const requestId = (window.crypto && window.crypto.randomUUID)
           ? window.crypto.randomUUID()
           : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-        const payload = {
-          source_path: state.datasetOssKey || "",
-          model_path: state.modelOssKey || "",
-          iterations: Number(dom.iterations.value || 30000),
-          mult: Number(dom.mult.value || 0.5),
-          white_background: false,
-          eval: false,
-          data_device: "cuda",
-          iteration: -1,
-          video360: dom.video360.checked,
-          use_dataset_cams: dom.useDatasetCams.checked,
-          use_test_cams: false,
-          interp_per_pair: Number(dom.interp.value || 3),
-          loop: false,
-          fps: Number(dom.fps.value || 30),
-          pose_path: dom.enablePose.checked ? (state.poseOssKey || "") : "",
-          frames: 240,
-          ease: true,
-          render_only: dom.renderOnly.checked,
-          session_id: state.sessionId,
-          request_id: requestId,
-        };
+        setRunStatus("上传输入文件到后端并提交队列", "warn");
+        const runFormData = buildRunFormData(requestId);
 
         setRunStatus("提交任务到队列", "warn");
-        startLogPolling();
-
-        const runResp = await fetch(`${state.runtimeApiBase}/run`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), config.uploadTimeoutMs);
+        let runResp;
+        try {
+          runResp = await fetch(`${state.runtimeApiBase}/run_with_files`, {
+            method: "POST",
+            body: runFormData,
+            signal: controller.signal,
+          });
+        } catch (error) {
+          if (error && error.name === "AbortError") {
+            const timeoutMin = Math.round(config.uploadTimeoutMs / 60000);
+            throw new Error(`任务提交超时（>${timeoutMin} 分钟），请检查文件大小和网络`);
+          }
+          throw error;
+        } finally {
+          window.clearTimeout(timer);
+        }
         const runData = await parseJsonSafe(runResp);
         if (!runResp.ok) {
           throw new Error((runData && runData.detail) || "任务提交失败");
@@ -886,6 +851,7 @@
 
         appendLog(`任务已入队: request_id=${runData.request_id}, position=${runData.position}`);
         setRunStatus("任务执行中", "warn");
+        startLogPolling();
 
         const resultData = await pollRequestUntilDone(requestId);
         const artifacts = (resultData.result && resultData.result.artifacts) || null;
@@ -950,18 +916,15 @@
     });
 
     dom.datasetFile.addEventListener("change", () => {
-      state.datasetOssKey = "";
-      dom.datasetStatus.textContent = dom.datasetFile.files[0] ? "已选择文件，待上传" : "未上传";
+      dom.datasetStatus.textContent = dom.datasetFile.files[0] ? "已选择，将随任务请求直传后端" : "未选择";
     });
 
     dom.modelFile.addEventListener("change", () => {
-      state.modelOssKey = "";
-      dom.modelStatus.textContent = dom.modelFile.files[0] ? "已选择文件，待上传" : "未上传";
+      dom.modelStatus.textContent = dom.modelFile.files[0] ? "已选择，将随任务请求直传后端" : "未选择";
     });
 
     dom.poseFile.addEventListener("change", () => {
-      state.poseOssKey = "";
-      dom.poseStatus.textContent = dom.poseFile.files[0] ? "已选择文件，待上传" : "未上传";
+      dom.poseStatus.textContent = dom.poseFile.files[0] ? "已选择，将随任务请求直传后端" : "未选择";
     });
 
     window.addEventListener("beforeunload", () => {
@@ -1152,7 +1115,7 @@
     appendLog(`task-manager=${config.taskManager}`);
     appendLog(`project=${config.project}`);
     appendLog(`upload_timeout=${Math.round(config.uploadTimeoutMs / 60000)} min`);
-    appendLog("就绪。点击“开始运行”后将自动恢复任务、上传输入并提交队列。");
+    appendLog("就绪。点击“开始运行”后将自动恢复任务，直传输入到后端并提交队列。");
   </script>
 </body>
 </html>

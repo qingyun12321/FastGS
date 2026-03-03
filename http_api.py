@@ -527,29 +527,49 @@ def _execute_run_request(request_id: str, payload: dict[str, Any]) -> dict[str, 
         input_dir = os.path.join(run_dir, "input")
         os.makedirs(input_dir, exist_ok=True)
 
+        dataset_zip_path = str(payload.get("dataset_zip_path") or "").strip()
+        model_zip_path = str(payload.get("model_zip_path") or "").strip()
+        pose_json_path = str(payload.get("pose_json_path") or "").strip()
+
         source_key = _normalize_oss_key((req.source_path or "").strip() or session.get("dataset_oss_key", ""))
         model_key = _normalize_oss_key((req.model_path or "").strip() or session.get("model_oss_key", ""))
         pose_key = _normalize_oss_key((req.pose_path or "").strip()) if req.pose_path else ""
 
-        if not req.render_only and not source_key:
-            raise RuntimeError("Dataset OSS key missing. Upload dataset first.")
-        if req.render_only and not model_key:
-            raise RuntimeError("render_only=true requires model OSS key.")
+        if dataset_zip_path and not os.path.exists(dataset_zip_path):
+            raise RuntimeError(f"dataset zip not found: {dataset_zip_path}")
+        if model_zip_path and not os.path.exists(model_zip_path):
+            raise RuntimeError(f"model zip not found: {model_zip_path}")
+        if pose_json_path and not os.path.exists(pose_json_path):
+            raise RuntimeError(f"pose json not found: {pose_json_path}")
+
+        if not req.render_only and not dataset_zip_path and not source_key:
+            raise RuntimeError("Dataset file missing for training mode.")
+        if req.render_only and not model_zip_path and not model_key:
+            raise RuntimeError("render_only=true requires model zip or model OSS key.")
 
         source_path = ""
-        if source_key:
+        if dataset_zip_path:
+            source_extract_dir = os.path.join(input_dir, "dataset", "extract")
+            _safe_extract_zip(dataset_zip_path, source_extract_dir)
+            source_path = _resolve_extracted_root(source_extract_dir)
+        elif source_key:
             source_path = _download_and_extract_zip(source_key, os.path.join(input_dir, "dataset"), "dataset.zip")
-        elif not req.render_only:
-            raise RuntimeError("Dataset OSS key missing. Upload dataset first.")
 
         if req.render_only:
-            model_path = _download_and_extract_zip(model_key, os.path.join(input_dir, "model"), "model.zip")
+            if model_zip_path:
+                model_extract_dir = os.path.join(input_dir, "model", "extract")
+                _safe_extract_zip(model_zip_path, model_extract_dir)
+                model_path = _resolve_extracted_root(model_extract_dir)
+            else:
+                model_path = _download_and_extract_zip(model_key, os.path.join(input_dir, "model"), "model.zip")
         else:
             model_path = os.path.join(run_dir, "output")
             os.makedirs(model_path, exist_ok=True)
 
         local_pose_path = ""
-        if pose_key:
+        if pose_json_path:
+            local_pose_path = pose_json_path
+        elif pose_key:
             local_pose_path = os.path.join(input_dir, "pose", f"pose_{int(time.time())}.json")
             oss_download_file(pose_key, local_pose_path)
 
@@ -590,7 +610,7 @@ def _execute_run_request(request_id: str, payload: dict[str, Any]) -> dict[str, 
                 needs_scene = (not req.render_only) or bool(local_pose_path) or bool(req.video360)
                 if needs_scene:
                     if not source_path:
-                        raise RuntimeError("Pose/video rendering requires dataset OSS input.")
+                        raise RuntimeError("Pose/video rendering requires dataset input.")
 
                     dataset = lp.extract(args)
                     scene, gaussians = _load_scene(dataset, args)
@@ -778,6 +798,108 @@ def logs(max_lines: int = 200, session_id: str = ""):
         log_path = _state.get("log_path") or ""
 
     return {"log": _tail_log(log_path, max(1, min(2000, max_lines)))}
+
+
+@app.post("/run_with_files")
+async def run_with_files(
+    session_id: str = Form(""),
+    request_id: str = Form(""),
+    iterations: int = Form(30000),
+    mult: float = Form(0.5),
+    white_background: bool = Form(False),
+    eval: bool = Form(False),
+    data_device: str = Form("cuda"),
+    iteration: int = Form(-1),
+    video360: bool = Form(False),
+    use_dataset_cams: bool = Form(False),
+    use_test_cams: bool = Form(False),
+    interp_per_pair: int = Form(3),
+    loop: bool = Form(False),
+    fps: int = Form(30),
+    frames: int = Form(240),
+    ease: bool = Form(True),
+    render_only: bool = Form(False),
+    dataset_file: UploadFile | None = File(None),
+    model_file: UploadFile | None = File(None),
+    pose_file: UploadFile | None = File(None),
+):
+    sid = (session_id or "").strip()
+    session = _get_session(sid, create_if_missing=True) if sid else _create_session()
+    rid = (request_id or "").strip() or str(uuid.uuid4())
+
+    direct_input_dir = os.path.join(session["session_dir"], "direct_inputs", rid)
+    os.makedirs(direct_input_dir, exist_ok=True)
+
+    req_data: dict[str, Any] = {
+        "session_id": session["session_id"],
+        "request_id": rid,
+        "iterations": int(iterations),
+        "mult": float(mult),
+        "white_background": bool(white_background),
+        "eval": bool(eval),
+        "data_device": str(data_device or "cuda"),
+        "iteration": int(iteration),
+        "video360": bool(video360),
+        "use_dataset_cams": bool(use_dataset_cams),
+        "use_test_cams": bool(use_test_cams),
+        "interp_per_pair": int(interp_per_pair),
+        "loop": bool(loop),
+        "fps": int(fps),
+        "frames": int(frames),
+        "ease": bool(ease),
+        "render_only": bool(render_only),
+        "source_path": "",
+        "model_path": "",
+        "pose_path": "",
+    }
+
+    try:
+        if dataset_file is not None:
+            if not (dataset_file.filename or "").lower().endswith(".zip"):
+                raise HTTPException(status_code=400, detail="dataset_file must be .zip")
+            dataset_zip_path = os.path.join(direct_input_dir, "dataset.zip")
+            await _save_upload_file(dataset_file, dataset_zip_path)
+            req_data["dataset_zip_path"] = dataset_zip_path
+        elif not bool(render_only):
+            raise HTTPException(status_code=409, detail="Training mode requires dataset_file (.zip)")
+
+        if model_file is not None:
+            if not (model_file.filename or "").lower().endswith(".zip"):
+                raise HTTPException(status_code=400, detail="model_file must be .zip")
+            model_zip_path = os.path.join(direct_input_dir, "model.zip")
+            await _save_upload_file(model_file, model_zip_path)
+            req_data["model_zip_path"] = model_zip_path
+        elif bool(render_only):
+            raise HTTPException(status_code=409, detail="render_only=true requires model_file (.zip)")
+
+        if pose_file is not None:
+            if not (pose_file.filename or "").lower().endswith(".json"):
+                raise HTTPException(status_code=400, detail="pose_file must be .json")
+            pose_json_path = os.path.join(direct_input_dir, "pose.json")
+            await _save_upload_file(pose_file, pose_json_path)
+            req_data["pose_json_path"] = pose_json_path
+
+        try:
+            request_id_out, position = _run_queue.enqueue(
+                req_data,
+                request_id=rid,
+                metadata={"session_id": session["session_id"]},
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception:
+        if os.path.isdir(direct_input_dir):
+            shutil.rmtree(direct_input_dir, ignore_errors=True)
+        raise
+
+    session["last_request_id"] = request_id_out
+
+    return {
+        "status": "queued",
+        "request_id": request_id_out,
+        "position": position,
+        "session_id": session["session_id"],
+    }
 
 
 @app.post("/upload_dataset")
