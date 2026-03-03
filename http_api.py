@@ -49,6 +49,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def request_debug_middleware(request, call_next):
+    req_tag = uuid.uuid4().hex[:8]
+    content_length = request.headers.get("content-length", "")
+    content_type = request.headers.get("content-type", "")
+    print(
+        f"[http][{req_tag}] -> {request.method} {request.url.path} "
+        f"cl={content_length or '-'} ct={content_type or '-'}"
+    )
+    started = time.time()
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        elapsed = time.time() - started
+        print(f"[http][{req_tag}] !! {type(exc).__name__} after {elapsed:.2f}s: {exc}")
+        raise
+
+    elapsed = time.time() - started
+    print(f"[http][{req_tag}] <- {response.status_code} {request.method} {request.url.path} {elapsed:.2f}s")
+    return response
+
 # ---------------------------------------------------------------------------
 # Runtime state
 # ---------------------------------------------------------------------------
@@ -826,6 +848,10 @@ async def run_with_files(
     sid = (session_id or "").strip()
     session = _get_session(sid, create_if_missing=True) if sid else _create_session()
     rid = (request_id or "").strip() or str(uuid.uuid4())
+    print(
+        f"[run_with_files] start session={session['session_id']} request_id={rid} "
+        f"render_only={render_only} video360={video360}"
+    )
 
     direct_input_dir = os.path.join(session["session_dir"], "direct_inputs", rid)
     os.makedirs(direct_input_dir, exist_ok=True)
@@ -858,7 +884,11 @@ async def run_with_files(
             if not (dataset_file.filename or "").lower().endswith(".zip"):
                 raise HTTPException(status_code=400, detail="dataset_file must be .zip")
             dataset_zip_path = os.path.join(direct_input_dir, "dataset.zip")
-            await _save_upload_file(dataset_file, dataset_zip_path)
+            dataset_bytes = await _save_upload_file(dataset_file, dataset_zip_path)
+            print(
+                f"[run_with_files] dataset saved bytes={dataset_bytes} "
+                f"filename={dataset_file.filename} path={dataset_zip_path}"
+            )
             req_data["dataset_zip_path"] = dataset_zip_path
         elif not bool(render_only):
             raise HTTPException(status_code=409, detail="Training mode requires dataset_file (.zip)")
@@ -867,7 +897,11 @@ async def run_with_files(
             if not (model_file.filename or "").lower().endswith(".zip"):
                 raise HTTPException(status_code=400, detail="model_file must be .zip")
             model_zip_path = os.path.join(direct_input_dir, "model.zip")
-            await _save_upload_file(model_file, model_zip_path)
+            model_bytes = await _save_upload_file(model_file, model_zip_path)
+            print(
+                f"[run_with_files] model saved bytes={model_bytes} "
+                f"filename={model_file.filename} path={model_zip_path}"
+            )
             req_data["model_zip_path"] = model_zip_path
         elif bool(render_only):
             raise HTTPException(status_code=409, detail="render_only=true requires model_file (.zip)")
@@ -876,7 +910,11 @@ async def run_with_files(
             if not (pose_file.filename or "").lower().endswith(".json"):
                 raise HTTPException(status_code=400, detail="pose_file must be .json")
             pose_json_path = os.path.join(direct_input_dir, "pose.json")
-            await _save_upload_file(pose_file, pose_json_path)
+            pose_bytes = await _save_upload_file(pose_file, pose_json_path)
+            print(
+                f"[run_with_files] pose saved bytes={pose_bytes} "
+                f"filename={pose_file.filename} path={pose_json_path}"
+            )
             req_data["pose_json_path"] = pose_json_path
 
         try:
@@ -887,9 +925,14 @@ async def run_with_files(
             )
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+        print(
+            f"[run_with_files] queued session={session['session_id']} "
+            f"request_id={request_id_out} position={position}"
+        )
     except Exception:
         if os.path.isdir(direct_input_dir):
             shutil.rmtree(direct_input_dir, ignore_errors=True)
+        print(f"[run_with_files] failed and cleaned direct_input_dir={direct_input_dir}")
         raise
 
     session["last_request_id"] = request_id_out

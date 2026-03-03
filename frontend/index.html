@@ -649,6 +649,62 @@
       return formData;
     }
 
+    function submitRunWithFiles(formData) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `${state.runtimeApiBase}/run_with_files`);
+        xhr.timeout = config.uploadTimeoutMs;
+
+        let lastLoggedPercent = -1;
+        let lastLogTs = 0;
+
+        xhr.upload.onprogress = (evt) => {
+          if (!evt.lengthComputable || evt.total <= 0) {
+            return;
+          }
+          const percent = Math.floor((evt.loaded / evt.total) * 100);
+          const now = Date.now();
+          const shouldLog = percent >= 100 || percent - lastLoggedPercent >= 5 || (now - lastLogTs >= 4000);
+          if (!shouldLog) {
+            return;
+          }
+          lastLoggedPercent = percent;
+          lastLogTs = now;
+          const loadedMb = (evt.loaded / 1024 / 1024).toFixed(1);
+          const totalMb = (evt.total / 1024 / 1024).toFixed(1);
+          setRunStatus(`上传输入文件到后端 ${percent}%`, "warn");
+          appendLog(`上传进度: ${percent}% (${loadedMb}/${totalMb} MB)`);
+        };
+
+        xhr.onload = () => {
+          const status = xhr.status;
+          const text = xhr.responseText || "";
+          let payload = null;
+          try {
+            payload = text ? JSON.parse(text) : null;
+          } catch (_) {
+            payload = null;
+          }
+          if (status >= 200 && status < 300) {
+            resolve(payload || {});
+            return;
+          }
+          const detail = (payload && (payload.detail || payload.message)) || text || `HTTP ${status}`;
+          reject(new Error(`任务提交失败: ${detail}`));
+        };
+
+        xhr.onerror = () => {
+          reject(new Error("任务提交网络错误（请求未到达后端或连接被中断）"));
+        };
+        xhr.ontimeout = () => {
+          const timeoutMin = Math.round(config.uploadTimeoutMs / 60000);
+          reject(new Error(`任务提交超时（>${timeoutMin} 分钟），请检查文件大小和网络`));
+        };
+
+        xhr.send(formData);
+      });
+    }
+
     function startLogPolling() {
       stopLogPolling();
       state.logTimer = setInterval(async () => {
@@ -824,30 +880,16 @@
 
         setRunStatus("上传输入文件到后端并提交队列", "warn");
         const runFormData = buildRunFormData(requestId);
+        const submitFiles = [
+          dom.datasetFile.files[0],
+          dom.modelFile.files[0],
+          dom.poseFile.files[0],
+        ].filter(Boolean);
+        const totalBytes = submitFiles.reduce((sum, f) => sum + (f.size || 0), 0);
+        appendLog(`准备提交文件总大小: ${(totalBytes / 1024 / 1024).toFixed(2)} MB`);
 
         setRunStatus("提交任务到队列", "warn");
-        const controller = new AbortController();
-        const timer = window.setTimeout(() => controller.abort(), config.uploadTimeoutMs);
-        let runResp;
-        try {
-          runResp = await fetch(`${state.runtimeApiBase}/run_with_files`, {
-            method: "POST",
-            body: runFormData,
-            signal: controller.signal,
-          });
-        } catch (error) {
-          if (error && error.name === "AbortError") {
-            const timeoutMin = Math.round(config.uploadTimeoutMs / 60000);
-            throw new Error(`任务提交超时（>${timeoutMin} 分钟），请检查文件大小和网络`);
-          }
-          throw error;
-        } finally {
-          window.clearTimeout(timer);
-        }
-        const runData = await parseJsonSafe(runResp);
-        if (!runResp.ok) {
-          throw new Error((runData && runData.detail) || "任务提交失败");
-        }
+        const runData = await submitRunWithFiles(runFormData);
 
         appendLog(`任务已入队: request_id=${runData.request_id}, position=${runData.position}`);
         setRunStatus("任务执行中", "warn");
