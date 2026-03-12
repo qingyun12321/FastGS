@@ -323,11 +323,11 @@
     <header>
       <div>
         <h1 class="title">KOKONI FastGS</h1>
-        <div class="subtitle">全链路 OSS 输入输出 + Task-Manager 托管恢复/暂停</div>
+        <div class="subtitle">百炼风格异步任务接入，Task-Manager 托管恢复与回收</div>
       </div>
       <div class="config-line">
         task-manager: <code id="cfg-task-manager"></code><br />
-        project: <code id="cfg-project"></code>
+        model: <code id="cfg-project"></code>
       </div>
     </header>
 
@@ -443,8 +443,8 @@
 
     const config = {
       taskManager: "http://36.133.236.108:8090",
-      project: "fastgs",
-      readyTimeoutMs: 15 * 60 * 1000,
+      model: "kokoni-gs",
+      apiKey: "",
       pollMs: 2000,
       uploadTimeoutMs: 30 * 60 * 1000,
     };
@@ -453,9 +453,9 @@
     if (qs.get("task_manager")) {
       config.taskManager = String(qs.get("task_manager")).replace(/\/$/, "");
     }
-    if (qs.get("project")) {
-      config.project = String(qs.get("project"));
-    }
+    if (qs.get("model")) config.model = String(qs.get("model"));
+    else if (qs.get("project")) config.model = String(qs.get("project"));
+    if (qs.get("api_key")) config.apiKey = String(qs.get("api_key"));
 
     const dom = {
       cfgTaskManager: document.getElementById("cfg-task-manager"),
@@ -489,13 +489,11 @@
     };
 
     const state = {
-      runtimeApiBase: "",
-      sessionId: "",
-      logTimer: null,
+      currentTaskId: "",
     };
 
     dom.cfgTaskManager.textContent = config.taskManager;
-    dom.cfgProject.textContent = config.project;
+    dom.cfgProject.textContent = config.model;
 
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -533,68 +531,36 @@
       }
     }
 
-    async function tmRecover() {
-      const resp = await fetch(`${config.taskManager}/api/task/recover`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project: config.project }),
-      });
-      const payload = await parseJsonSafe(resp);
-      if (!resp.ok) {
-        const detail = (payload && (payload.detail || payload.message)) || (await resp.text()) || `HTTP ${resp.status}`;
-        throw new Error(`恢复任务失败: ${detail}`);
+    function authHeaders(extra = {}) {
+      const headers = { ...extra };
+      if (config.apiKey) {
+        headers.Authorization = `Bearer ${config.apiKey}`;
       }
-      return payload || {};
+      return headers;
+    }
+
+    async function readApiError(resp) {
+      const payload = await parseJsonSafe(resp);
+      if (payload && (payload.message || payload.detail)) {
+        return payload.message || payload.detail;
+      }
+      return (await resp.text()) || `HTTP ${resp.status}`;
     }
 
     async function tmPause() {
       const resp = await fetch(`${config.taskManager}/api/task/pause`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project: config.project }),
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ project: config.model }),
       });
-      const payload = await parseJsonSafe(resp);
       if (!resp.ok) {
-        const detail = (payload && (payload.detail || payload.message)) || (await resp.text()) || `HTTP ${resp.status}`;
+        const detail = await readApiError(resp);
         throw new Error(`暂停任务失败: ${detail}`);
       }
-      return payload || {};
+      return await parseJsonSafe(resp);
     }
 
-    async function waitForHealth(baseUrl) {
-      const deadline = Date.now() + config.readyTimeoutMs;
-      const normalized = normalizeBase(baseUrl);
-      while (Date.now() < deadline) {
-        try {
-          const resp = await fetch(`${normalized}/health`, { cache: "no-store" });
-          if (resp.ok) {
-            return;
-          }
-        } catch (_) {
-          // ignore
-        }
-        await sleep(config.pollMs);
-      }
-      throw new Error("等待后端就绪超时");
-    }
-
-    async function ensureSession() {
-      if (state.sessionId) {
-        return state.sessionId;
-      }
-
-      const resp = await fetch(`${state.runtimeApiBase}/create_session`, { method: "POST" });
-      const data = await parseJsonSafe(resp);
-      if (!resp.ok || !data || !data.session_id) {
-        throw new Error((data && data.detail) || "创建会话失败");
-      }
-
-      state.sessionId = data.session_id;
-      appendLog(`session_id=${state.sessionId}`);
-      return state.sessionId;
-    }
-
-    function buildRunFormData(requestId) {
+    function buildTaskFormData() {
       const dataset = dom.datasetFile.files[0] || null;
       const model = dom.modelFile.files[0] || null;
       const pose = dom.poseFile.files[0] || null;
@@ -612,23 +578,33 @@
       }
 
       const formData = new FormData();
-      formData.append("session_id", state.sessionId);
-      formData.append("request_id", requestId);
-      formData.append("iterations", String(Number(dom.iterations.value || 30000)));
-      formData.append("mult", String(Number(dom.mult.value || 0.5)));
-      formData.append("white_background", "false");
-      formData.append("eval", "false");
-      formData.append("data_device", "cuda");
-      formData.append("iteration", "-1");
-      formData.append("video360", String(Boolean(dom.video360.checked)));
-      formData.append("use_dataset_cams", String(Boolean(dom.useDatasetCams.checked)));
-      formData.append("use_test_cams", "false");
-      formData.append("interp_per_pair", String(Number(dom.interp.value || 3)));
-      formData.append("loop", "false");
-      formData.append("fps", String(Number(dom.fps.value || 30)));
-      formData.append("frames", "240");
-      formData.append("ease", "true");
-      formData.append("render_only", String(renderOnly));
+      const requestId = crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const requestPayload = {
+        model: config.model,
+        input: {
+          request_id: requestId,
+        },
+        parameters: {
+          iterations: Number(dom.iterations.value || 30000),
+          mult: Number(dom.mult.value || 0.5),
+          white_background: false,
+          eval: false,
+          data_device: "cuda",
+          iteration: -1,
+          video360: Boolean(dom.video360.checked),
+          use_dataset_cams: Boolean(dom.useDatasetCams.checked),
+          use_test_cams: false,
+          interp_per_pair: Number(dom.interp.value || 3),
+          loop: false,
+          fps: Number(dom.fps.value || 30),
+          frames: 240,
+          ease: true,
+          render_only: renderOnly,
+        },
+      };
+      formData.append("request", JSON.stringify(requestPayload));
 
       if (dataset) {
         appendLog(`附加数据集文件: ${dataset.name} (${(dataset.size / 1024 / 1024).toFixed(2)} MB)`);
@@ -646,14 +622,17 @@
         formData.append("pose_file", pose);
       }
 
-      return formData;
+      return { formData, requestId };
     }
 
-    function submitRunWithFiles(formData) {
+    function createTask(formData) {
       return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open("POST", `${state.runtimeApiBase}/run_with_files`);
+        xhr.open("POST", `${config.taskManager}/api/v1/services/aigc/3d-generation/reconstruction`);
         xhr.timeout = config.uploadTimeoutMs;
+        if (config.apiKey) {
+          xhr.setRequestHeader("Authorization", `Bearer ${config.apiKey}`);
+        }
 
         let lastLoggedPercent = -1;
         let lastLogTs = 0;
@@ -705,58 +684,36 @@
       });
     }
 
-    function startLogPolling() {
-      stopLogPolling();
-      state.logTimer = setInterval(async () => {
-        if (!state.runtimeApiBase || !state.sessionId) {
-          return;
-        }
-        try {
-          const resp = await fetch(
-            `${state.runtimeApiBase}/logs?session_id=${encodeURIComponent(state.sessionId)}&max_lines=400`,
-            { cache: "no-store" },
-          );
-          const data = await parseJsonSafe(resp);
-          if (resp.ok && data && typeof data.log === "string") {
-            dom.logBox.textContent = data.log;
-            dom.logBox.scrollTop = dom.logBox.scrollHeight;
-          }
-        } catch (_) {
-          // ignore polling error
-        }
-      }, config.pollMs);
+    async function loadTask(taskId) {
+      const resp = await fetch(`${config.taskManager}/api/v1/tasks/${encodeURIComponent(taskId)}`, {
+        cache: "no-store",
+        headers: authHeaders(),
+      });
+      if (!resp.ok) {
+        throw new Error(await readApiError(resp));
+      }
+      return await resp.json();
     }
 
-    function stopLogPolling() {
-      if (state.logTimer) {
-        clearInterval(state.logTimer);
-        state.logTimer = null;
-      }
-    }
-
-    function applyQueueStatus(payload) {
-      if (!payload) {
-        return;
-      }
-      if (payload.status === "processing" || payload.position === 0) {
+    function applyTaskStatus(output, message = "") {
+      if (!output) return;
+      const status = output.task_status;
+      if (status === "PENDING") {
+        setRunStatus("等待可用节点", "warn");
+        setQueueStatus("排队中", "warn");
+      } else if (status === "SCALING") {
+        setRunStatus(message || "平台正在准备可用算力，请继续轮询。", "warn");
+        setQueueStatus("扩缩容中", "warn");
+      } else if (status === "RUNNING") {
+        setRunStatus("任务执行中", "warn");
         setQueueStatus("处理中", "warn");
-        return;
-      }
-      if (payload.status === "pending") {
-        const position = Number(payload.position || 1);
-        const ahead = Math.max(0, position - 1);
-        setQueueStatus(`排队中（前方 ${ahead} 个）`, "warn");
-        return;
-      }
-      if (payload.status === "completed") {
+      } else if (status === "SUCCEEDED") {
+        setRunStatus("任务完成", "ok");
         setQueueStatus("已完成", "ok");
-        return;
-      }
-      if (payload.status === "failed") {
+      } else if (status === "FAILED") {
+        setRunStatus(`失败: ${message || "任务执行失败"}`, "err");
         setQueueStatus("失败", "err");
-        return;
       }
-      setQueueStatus("待机");
     }
 
     function clearResultUI() {
@@ -817,69 +774,30 @@
       }
     }
 
-    async function pollRequestUntilDone(requestId) {
+    async function pollTaskUntilDone(taskId) {
       while (true) {
-        const qResp = await fetch(
-          `${state.runtimeApiBase}/queue_status?request_id=${encodeURIComponent(requestId)}`,
-          { cache: "no-store" },
-        );
-        const qData = await parseJsonSafe(qResp);
-        if (qResp.ok) {
-          applyQueueStatus(qData);
+        const taskResp = await loadTask(taskId);
+        const output = taskResp.output || {};
+        const status = output.task_status || "";
+        applyTaskStatus(output, taskResp.message || "");
+        if (status === "SUCCEEDED") {
+          return output;
         }
-
-        const sResp = await fetch(
-          `${state.runtimeApiBase}/request_status?request_id=${encodeURIComponent(requestId)}`,
-          { cache: "no-store" },
-        );
-        const sData = await parseJsonSafe(sResp);
-        if (!sResp.ok) {
-          throw new Error((sData && sData.detail) || "读取 request_status 失败");
+        if (status === "FAILED") {
+          throw new Error(taskResp.message || "任务执行失败");
         }
-
-        if (sData.status === "completed") {
-          return sData;
-        }
-        if (sData.status === "failed") {
-          throw new Error(sData.error || "任务执行失败");
-        }
-
         await sleep(config.pollMs);
       }
     }
 
     async function runTaskWorkflow() {
       dom.runBtn.disabled = true;
-      let recoveredByThisRun = false;
-      let paused = false;
 
       try {
         clearResultUI();
-        setRunStatus("恢复算力任务中", "warn");
+        setRunStatus("提交任务中", "warn");
         setQueueStatus("准备中", "warn");
-
-        const recoverData = await tmRecover();
-        state.runtimeApiBase = normalizeBase(recoverData.service_url || "");
-        recoveredByThisRun = Boolean(recoverData.recovered);
-
-        if (!state.runtimeApiBase) {
-          throw new Error("recover 返回的 service_url 为空");
-        }
-
-        appendLog(`任务恢复完成: recovered=${recoverData.recovered}, service_url=${state.runtimeApiBase}`);
-
-        setRunStatus("等待后端健康检查", "warn");
-        await waitForHealth(state.runtimeApiBase);
-        appendLog("后端健康检查通过");
-
-        await ensureSession();
-
-        const requestId = (window.crypto && window.crypto.randomUUID)
-          ? window.crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-        setRunStatus("上传输入文件到后端并提交队列", "warn");
-        const runFormData = buildRunFormData(requestId);
+        const { formData, requestId } = buildTaskFormData();
         const submitFiles = [
           dom.datasetFile.files[0],
           dom.modelFile.files[0],
@@ -888,15 +806,16 @@
         const totalBytes = submitFiles.reduce((sum, f) => sum + (f.size || 0), 0);
         appendLog(`准备提交文件总大小: ${(totalBytes / 1024 / 1024).toFixed(2)} MB`);
 
-        setRunStatus("提交任务到队列", "warn");
-        const runData = await submitRunWithFiles(runFormData);
+        const createResp = await createTask(formData);
+        const taskId = createResp.output?.task_id;
+        if (!taskId) {
+          throw new Error("任务创建成功但未返回 task_id");
+        }
+        state.currentTaskId = taskId;
+        appendLog(`任务已创建: task_id=${taskId}, request_id=${requestId}`);
 
-        appendLog(`任务已入队: request_id=${runData.request_id}, position=${runData.position}`);
-        setRunStatus("任务执行中", "warn");
-        startLogPolling();
-
-        const resultData = await pollRequestUntilDone(requestId);
-        const artifacts = (resultData.result && resultData.result.artifacts) || null;
+        const resultOutput = await pollTaskUntilDone(taskId);
+        const artifacts = resultOutput.artifacts || null;
 
         setLinksFromArtifacts(artifacts);
 
@@ -911,13 +830,9 @@
           clearPlyViewer("未找到可预览的 PLY 输出");
         }
 
-        setRunStatus("任务完成，正在暂停算力任务", "warn");
-        await tmPause();
-        paused = true;
-
-        setRunStatus("完成（任务已暂停）", "ok");
+        setRunStatus("完成", "ok");
         setQueueStatus("已完成", "ok");
-        appendLog("任务完成，结果已上传 OSS，算力任务已暂停。");
+        appendLog(`任务完成，结果已上传 OSS。session_id=${resultOutput.session_id || ""}`);
 
       } catch (error) {
         const message = error && error.message ? error.message : String(error || "未知错误");
@@ -925,15 +840,6 @@
         setQueueStatus("失败", "err");
         appendLog(`运行失败: ${message}`);
       } finally {
-        stopLogPolling();
-        if (recoveredByThisRun && !paused) {
-          try {
-            await tmPause();
-            appendLog("失败兜底：已自动暂停任务。");
-          } catch (pauseErr) {
-            appendLog(`失败兜底暂停失败: ${pauseErr.message}`);
-          }
-        }
         dom.runBtn.disabled = false;
       }
     }
@@ -967,15 +873,6 @@
 
     dom.poseFile.addEventListener("change", () => {
       dom.poseStatus.textContent = dom.poseFile.files[0] ? "已选择，将随任务请求直传后端" : "未选择";
-    });
-
-    window.addEventListener("beforeunload", () => {
-      if (!state.runtimeApiBase || !state.sessionId) {
-        return;
-      }
-      const formData = new FormData();
-      formData.append("session_id", state.sessionId);
-      navigator.sendBeacon(`${state.runtimeApiBase}/cleanup`, formData);
     });
 
     // ----------------------------------------------------------------------
@@ -1155,9 +1052,9 @@
     }
 
     appendLog(`task-manager=${config.taskManager}`);
-    appendLog(`project=${config.project}`);
+    appendLog(`model=${config.model}`);
     appendLog(`upload_timeout=${Math.round(config.uploadTimeoutMs / 60000)} min`);
-    appendLog("就绪。点击“开始运行”后将自动恢复任务，直传输入到后端并提交队列。");
+    appendLog("就绪。点击“开始运行”后将通过 task-manager 创建异步任务。");
   </script>
 </body>
 </html>

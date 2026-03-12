@@ -18,6 +18,7 @@ import uuid
 import zipfile
 from argparse import ArgumentParser
 from contextlib import redirect_stderr, redirect_stdout
+from threading import Lock
 from typing import Any
 
 import numpy as np
@@ -84,6 +85,36 @@ _state: dict[str, Any] = {
 
 _sessions: dict[str, dict[str, Any]] = {}
 _run_queue = SingleWorkerTaskQueue()
+
+
+class RuntimeSingleFlight:
+    """Allow only one active FastGS job per pod."""
+
+    def __init__(self) -> None:
+        self._lock = Lock()
+        self._current_request_id: str | None = None
+
+    def try_acquire(self, request_id: str) -> bool:
+        with self._lock:
+            if self._current_request_id is not None:
+                return False
+            self._current_request_id = request_id
+            return True
+
+    def finish(self, request_id: str) -> None:
+        with self._lock:
+            if self._current_request_id == request_id:
+                self._current_request_id = None
+
+    def status(self) -> dict[str, Any]:
+        with self._lock:
+            return {
+                "busy": self._current_request_id is not None,
+                "current_request_id": self._current_request_id or "",
+            }
+
+
+RUNTIME_STATE = RuntimeSingleFlight()
 
 # ---------------------------------------------------------------------------
 # OSS config
@@ -764,6 +795,7 @@ def status():
     data = dict(_state)
     data["sessions"] = len(_sessions)
     data["queue"] = _run_queue.get_queue_status()
+    data["runtime"] = RUNTIME_STATE.status()
     return data
 
 
@@ -848,6 +880,8 @@ async def run_with_files(
     sid = (session_id or "").strip()
     session = _get_session(sid, create_if_missing=True) if sid else _create_session()
     rid = (request_id or "").strip() or str(uuid.uuid4())
+    if not RUNTIME_STATE.try_acquire(rid):
+        raise HTTPException(status_code=503, detail="node busy")
     print(
         f"[run_with_files] start session={session['session_id']} request_id={rid} "
         f"render_only={render_only} video360={video360}"
@@ -917,32 +951,25 @@ async def run_with_files(
             )
             req_data["pose_json_path"] = pose_json_path
 
-        try:
-            request_id_out, position = _run_queue.enqueue(
-                req_data,
-                request_id=rid,
-                metadata={"session_id": session["session_id"]},
-            )
-        except ValueError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
         print(
-            f"[run_with_files] queued session={session['session_id']} "
-            f"request_id={request_id_out} position={position}"
+            f"[run_with_files] executing session={session['session_id']} "
+            f"request_id={rid} mode={'render_only' if render_only else 'train'}"
         )
+        result = await asyncio.to_thread(_execute_run_request, rid, req_data)
     except Exception:
         if os.path.isdir(direct_input_dir):
             shutil.rmtree(direct_input_dir, ignore_errors=True)
         print(f"[run_with_files] failed and cleaned direct_input_dir={direct_input_dir}")
         raise
+    finally:
+        RUNTIME_STATE.finish(rid)
 
-    session["last_request_id"] = request_id_out
-
-    return {
-        "status": "queued",
-        "request_id": request_id_out,
-        "position": position,
-        "session_id": session["session_id"],
-    }
+    session["last_request_id"] = rid
+    response = dict(result)
+    response["request_id"] = rid
+    response["session_id"] = session["session_id"]
+    response["status"] = "completed"
+    return response
 
 
 @app.post("/upload_dataset")
