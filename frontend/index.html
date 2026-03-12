@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>KOKONI FastGS</title>
+  <title>KOKONI GS</title>
   <style>
     :root {
       --bg: #0c1118;
@@ -57,22 +57,6 @@
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
-    }
-
-    .subtitle {
-      margin-top: 6px;
-      color: var(--text-soft);
-      font-size: 0.92rem;
-    }
-
-    .config-line {
-      font-size: 0.82rem;
-      color: var(--text-soft);
-    }
-
-    .config-line code {
-      color: #cbe2ff;
-      font-size: 0.82rem;
     }
 
     .layout {
@@ -131,12 +115,6 @@
       font-size: 0.78rem;
       color: var(--text-soft);
       word-break: break-all;
-    }
-
-    .hint {
-      margin-top: 4px;
-      font-size: 0.78rem;
-      color: var(--text-soft);
     }
 
     .inline-check {
@@ -322,12 +300,7 @@
   <main class="page">
     <header>
       <div>
-        <h1 class="title">KOKONI FastGS</h1>
-        <div class="subtitle">百炼风格异步任务接入，Task-Manager 托管恢复与回收</div>
-      </div>
-      <div class="config-line">
-        task-manager: <code id="cfg-task-manager"></code><br />
-        model: <code id="cfg-project"></code>
+        <h1 class="title">KOKONI GS</h1>
       </div>
     </header>
 
@@ -388,7 +361,6 @@
               <input id="mult" type="number" min="0.1" step="0.1" value="0.5" />
             </div>
           </div>
-          <div class="hint">运行时会直接将文件传给后端处理；后端完成后仅上传核心结果到 OSS。</div>
         </div>
 
         <div class="actions">
@@ -407,7 +379,6 @@
         <h2>任务状态与结果</h2>
         <div class="status-row">
           <div id="run-status" class="status-pill">状态：就绪</div>
-          <div id="queue-status" class="status-pill">队列：待机</div>
         </div>
 
         <div class="result-box">
@@ -422,7 +393,7 @@
 
         <div class="viewer-box">
           <div id="ply-viewer"></div>
-          <div id="ply-placeholder" class="viewer-placeholder">任务完成后将在此预览 OSS 返回的 PLY 点云。</div>
+          <div id="ply-placeholder" class="viewer-placeholder">任务完成后将在此预览</div>
         </div>
       </section>
     </section>
@@ -458,8 +429,6 @@
     if (qs.get("api_key")) config.apiKey = String(qs.get("api_key"));
 
     const dom = {
-      cfgTaskManager: document.getElementById("cfg-task-manager"),
-      cfgProject: document.getElementById("cfg-project"),
       datasetFile: document.getElementById("dataset-file"),
       modelFile: document.getElementById("model-file"),
       poseFile: document.getElementById("pose-file"),
@@ -479,7 +448,6 @@
       clearBtn: document.getElementById("clear-btn"),
       logBox: document.getElementById("log-box"),
       runStatus: document.getElementById("run-status"),
-      queueStatus: document.getElementById("queue-status"),
       downloadLinks: document.getElementById("download-links"),
       posePreview: document.getElementById("pose-preview"),
       videoWrap: document.getElementById("video-wrap"),
@@ -491,9 +459,6 @@
     const state = {
       currentTaskId: "",
     };
-
-    dom.cfgTaskManager.textContent = config.taskManager;
-    dom.cfgProject.textContent = config.model;
 
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -508,14 +473,6 @@
       dom.runStatus.classList.remove("ok", "warn", "err");
       if (type) {
         dom.runStatus.classList.add(type);
-      }
-    }
-
-    function setQueueStatus(text, type = "") {
-      dom.queueStatus.textContent = `队列：${text}`;
-      dom.queueStatus.classList.remove("ok", "warn", "err");
-      if (type) {
-        dom.queueStatus.classList.add(type);
       }
     }
 
@@ -700,19 +657,14 @@
       const status = output.task_status;
       if (status === "PENDING") {
         setRunStatus("等待可用节点", "warn");
-        setQueueStatus("排队中", "warn");
       } else if (status === "SCALING") {
         setRunStatus(message || "平台正在准备可用算力，请继续轮询。", "warn");
-        setQueueStatus("扩缩容中", "warn");
       } else if (status === "RUNNING") {
         setRunStatus("任务执行中", "warn");
-        setQueueStatus("处理中", "warn");
       } else if (status === "SUCCEEDED") {
         setRunStatus("任务完成", "ok");
-        setQueueStatus("已完成", "ok");
       } else if (status === "FAILED") {
         setRunStatus(`失败: ${message || "任务执行失败"}`, "err");
-        setQueueStatus("失败", "err");
       }
     }
 
@@ -722,7 +674,7 @@
       dom.videoPreview.removeAttribute("src");
       dom.posePreview.style.display = "none";
       dom.posePreview.removeAttribute("src");
-      clearPlyViewer("任务完成后将在此预览 OSS 返回的 PLY 点云。");
+      clearPlyViewer("任务完成后将在此预览");
     }
 
     function setLinksFromArtifacts(artifacts) {
@@ -796,7 +748,6 @@
       try {
         clearResultUI();
         setRunStatus("提交任务中", "warn");
-        setQueueStatus("准备中", "warn");
         const { formData, requestId } = buildTaskFormData();
         const submitFiles = [
           dom.datasetFile.files[0],
@@ -831,13 +782,11 @@
         }
 
         setRunStatus("完成", "ok");
-        setQueueStatus("已完成", "ok");
         appendLog(`任务完成，结果已上传 OSS。session_id=${resultOutput.session_id || ""}`);
 
       } catch (error) {
         const message = error && error.message ? error.message : String(error || "未知错误");
         setRunStatus(`失败: ${message}`, "err");
-        setQueueStatus("失败", "err");
         appendLog(`运行失败: ${message}`);
       } finally {
         dom.runBtn.disabled = false;
@@ -860,7 +809,6 @@
       dom.logBox.textContent = "";
       clearResultUI();
       setRunStatus("就绪");
-      setQueueStatus("待机");
     });
 
     dom.datasetFile.addEventListener("change", () => {
@@ -1051,8 +999,6 @@
       dom.plyPlaceholder.style.display = "none";
     }
 
-    appendLog(`task-manager=${config.taskManager}`);
-    appendLog(`model=${config.model}`);
     appendLog(`upload_timeout=${Math.round(config.uploadTimeoutMs / 60000)} min`);
     appendLog("就绪。点击“开始运行”后将通过 task-manager 创建异步任务。");
   </script>
